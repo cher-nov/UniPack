@@ -34,8 +34,8 @@ begin
   WriteLn( 'Written by Kodi Studio, 2015' );
 
   if ( ParamCount = 0 ) then begin
-    WriteLn( 'Usage: unipack.exe folder output.upa' );
-
+    WriteLn( 'Usage: unipack.exe path output.upa' );
+    WriteLn( '  path - directory with files to archive' );
   end;
 
   // stop program loop
