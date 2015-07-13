@@ -18,7 +18,7 @@
 
     #ifndef DLL_EXPORT  /* defined(DLL_EXPORT) */
 
-        #ifdef __WINDOWS__
+        #ifdef _WIN32
 
             #define DLL_EXPORT __cdecl __declspec( dllexport )  /* defined(export for windows) */
 
