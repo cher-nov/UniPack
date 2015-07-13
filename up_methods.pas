@@ -10,7 +10,7 @@ uses
 
 const
   UP_NOERR = 0;
-  UP_NAMELEN = 4;
+  UP_NAMELEN = SizeOf(LongInt);
 
 { –=────────────────────────────────────────────────────────────────────────=– }
 type { Auxiliary types for TUniMethod ════════════════════════════════════════ }
@@ -63,8 +63,6 @@ type { TUniMethod - UniPack method library ════════════�
     property Version: Integer read FVersion;
   end;
 
-  TUniMethods = class of TUniMethod;
-
 implementation {═══════════════════════════════════════════════════════════════}
 
 uses StrUtils;
@@ -73,7 +71,7 @@ uses StrUtils;
 
 constructor TUniMethod.Create( ALibFile: String );
 var
-  NameInt : Integer;
+  NameInt : LongInt;
   MGetName : TUniPackGetName;
   MGetVersion : TUniPackGetVersion;
 begin
