@@ -30,12 +30,17 @@
         <FormatVersion Value="1"/>
       </local>
     </RunParams>
-    <Units Count="1">
+    <Units Count="2">
       <Unit0>
         <Filename Value="unipack.lpr"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="unipack"/>
       </Unit0>
+      <Unit1>
+        <Filename Value="up_methods.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="up_methods"/>
+      </Unit1>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
