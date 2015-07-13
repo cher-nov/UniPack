@@ -1,54 +1,39 @@
-#ifndef ____NOPE__
-    #define ____NOPE__
+/*
+  NOPE.H
+  (c) KoDi studio, 2015
+*/
 
-    #include <stdio.h>
+#ifndef __NOPE_H__
+#define __NOPE_H__
 
-    /* initialization dll property */
+#include <stdio.h>
 
-    #define DLL_VERSION 1
-    #define DLL_NAME 'NOPE'
+#ifndef DLL_EXPORT
+  #if defined(_WIN32)
+    #define DLL_EXPORT __cdecl __declspec( dllexport )
+  #endif
+  #if defined(__APPLE__) && defined(__MACH__)
+    #define DLL_EXPORT __cdecl __attribute__(( visibility( "default" )))
+  #endif
+  #ifndef DLL_EXPORT
+    #error "OS not supported!"
+  #endif
+#endif
 
-    /* end initialization */
+#define DLL_NAME 'NOPE'
+#define DLL_VERSION 1
 
-    #ifndef DLL_EXPORT  /* defined(DLL_EXPORT) */
+#define E_OK 0
+#define E_BAD_INPUT 1
+#define E_LOST_SIZE 2
 
-        #ifdef __WINDOWS__
+DLL_EXPORT int get_name();
+DLL_EXPORT int get_version();
 
-            #define DLL_EXPORT __cdecl __declspec( dllexport )  /* defined(export for windows) */
+DLL_EXPORT void* compress( void*, int );
+DLL_EXPORT void* decompress( void*, int, int );
 
-        #elif __APPLE__
+DLL_EXPORT int get_err();
+DLL_EXPORT char* err_str( int );
 
-            #define DLL_EXPORT __cdecl __attribute__(( visibility( "default" )))  /* defined(export for mac os) */
-
-        #else
-
-            #error "OS not supported!"
-
-        #endif
-
-    #endif /* end define DDL_EXPORT */
-
-    /* give information about dll */
-
-    int get_name();
-    int get_version();
-
-    /* initialization compress functions */
-
-    void* compress(void* data, int size_data);
-    void* decompress(void* data, int size_data, int out_size);
-
-    /* initialization errors defines and functions */
-
-    /* error defines */
-
-    #define E_OK 0
-    #define E_BAD_INPUT 1
-    #define E_LOST_SIZE 2
-
-    /* error functions */
-
-    int get_err();
-    char* err_str(int a_error);
-
-#endif /* defined(____huff__) */
+#endif // __NOPE_H__
