@@ -5,14 +5,11 @@ program unipack;
 
 uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
-  cthreads,
-  {$ENDIF}{$ENDIF}
-  Classes, SysUtils, CustApp
-  { you can add units after this };
+  cthreads, {$ENDIF}{$ENDIF}
+  Classes, SysUtils, CustApp,
+  up_methods;
 
 type
-
-  { TMainApp }
 
   TMainApp = class( TCustomApplication )
   const
@@ -27,19 +24,29 @@ type
 { TMainApp }
 
 procedure TMainApp.DoRun();
-var
-  ErrorMsg: String;
 begin
   WriteLn( Title, ' ', APPVER );
   WriteLn( 'Written by Kodi Studio, 2015' );
 
   if ( ParamCount = 0 ) then begin
-    WriteLn( 'Usage: unipack.exe path output.upa' );
-    WriteLn( '  path - directory with files to archive' );
+    WriteLn( 'Usage: unipack.exe /[a|u] <-F archive.upa> <-D path> [options]' );
+    WriteLn( '  /a - pack mode, /u - unpack mode' );
+    WriteLn( 'Arguments:' );
+    WriteLn( '  -F arch.upa' );
+    WriteLn( '    a: set output filename as arch.upa' );
+    WriteLn( '    u: archive file to unpack' );
+    WriteLn( '  -D path' );
+    WriteLn( '    a: directory with files to archive' );
+    WriteLn( '    u: set output directory for unpacked files' );
+    WriteLn( 'Options:' );
+    WriteLn( '  /l - output list of avaliable packing methods and exit' );
+    WriteLn( '  /i - output file information and exit' );
+    WriteLn( '  /q - quiet mode (without detailed logging) ' );
+    WriteLn( '  /m METHOD - set compression method, METHOD = NAME:VER' );
+    Terminate(); Exit();
   end;
 
-  // stop program loop
-  Terminate;
+  Terminate();
 end;
 
 constructor TMainApp.Create( TheOwner: TComponent );
