@@ -1,7 +1,7 @@
-//
-//  Created by Kodi studio (Томак Дмитрий, Николай Глущенко) on 13.07.15.
-//  Copyright (c) 2015 Kodi studio. All rights reserved.
-//
+/*
+ HUFF.H
+ (c) KoDi studio, 2015
+ */
 
 #include "huff.h"
 #include <memory.h>
@@ -12,17 +12,17 @@ int lib_compsize = 0;
 
 /* initialization functions */
 
-DLL_EXPORT int get_name()  {
+int get_name()  {
     return DLL_NAME;
 }
 
-DLL_EXPORT int get_version()  {
+int get_version()  {
     return DLL_VERSION;
 }
 
 /* compress functions */
 
-DLL_EXPORT void* compress(void* data, int size_data)  {
+void* compress(void* data, int size_data)  {
     /* check errors */
     if (data == NULL)  {
         lib_error = E_BAD_INPUT;
@@ -40,7 +40,7 @@ DLL_EXPORT void* compress(void* data, int size_data)  {
     return 0;
 }
 
-DLL_EXPORT void* decompress(void* data, int size_data, int out_size)  {
+void* decompress(void* data, int size_data, int out_size)  {
     /*check errors */
     if (data == NULL)  {
         lib_error = E_BAD_INPUT;
@@ -57,13 +57,13 @@ DLL_EXPORT void* decompress(void* data, int size_data, int out_size)  {
 
 /* errors functions */
 
-DLL_EXPORT int get_err() {
+int get_err() {
     int err = lib_error;
     lib_error = E_OK;
     return err;
 }
 
-DLL_EXPORT char* err_str(int a_error)  {
+char* err_str(int a_error)  {
     switch (a_error)  {
         case E_OK:
             return "no errors";

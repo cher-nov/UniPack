@@ -1,60 +1,39 @@
-//
-//  Created by Kodi studio (Томак Дмитрий, Николай Глущенко) on 13.07.15.
-//  Copyright (c) 2015 Kodi studio. All rights reserved.
-//
+/*
+ HUFF.H
+ (c) KoDi studio, 2015
+ */
 
-#ifndef __huff__huff__
+#ifndef __HUFF_H__
+#define __HUFF_H__
 
-    #define __huff__huff__
+#include <stdio.h>
 
-    #include <stdio.h>
+#ifndef DLL_EXPORT
+    #if defined(_WIN32)
+        #define DLL_EXPORT __cdecl __declspec( dllexport )
+    #endif
+    #if defined(__APPLE__) && defined(__MACH__)
+        #define DLL_EXPORT __cdecl __attribute__(( visibility( "default" )))
+    #endif
+    #ifndef DLL_EXPORT
+        #error "OS not supported!"
+    #endif
+#endif
 
-    /* initialization dll property */
+#define DLL_NAME 'NOPE'
+#define DLL_VERSION 1
 
-    #define DLL_VERSION 1
-    #define DLL_NAME 'HUFF'
+#define E_OK 0
+#define E_BAD_INPUT 1
+#define E_LOST_SIZE 2
 
-    /* end initialization */
+DLL_EXPORT int get_name();
+DLL_EXPORT int get_version();
 
-    #ifndef DLL_EXPORT  /* defined(DLL_EXPORT) */
+DLL_EXPORT void* compress( void*, int );
+DLL_EXPORT void* decompress( void*, int, int );
 
-        #ifdef _WIN32
+DLL_EXPORT int get_err();
+DLL_EXPORT char* err_str( int );
 
-            #define DLL_EXPORT __cdecl __declspec( dllexport )  /* defined(export for windows) */
-
-        #elif __APPLE__
-
-            #define DLL_EXPORT __cdecl __attribute__(( visibility( "default" )))  /* defined(export for mac os) */
-
-        #else
-
-            #error "OS not supported!"
-
-        #endif
-
-    #endif /* end define DDL_EXPORT */
-
-    /* give information about dll */
-
-    int get_name();
-    int get_version();
-
-    /* initialization compress functions */
-
-    void* compress(void* data, int size_data);
-    void* decompress(void* data, int size_data, int out_size);
-
-    /* initialization errors defines and functions */
-
-    /* error defines */
-
-    #define E_OK 0
-    #define E_BAD_INPUT 1
-    #define E_LOST_SIZE 2
-
-    /* error functions */
-
-    int get_err();
-    char* err_str(int a_error);
-
-#endif /* defined(____huff__) */
+#endif // __HUFF_H__
