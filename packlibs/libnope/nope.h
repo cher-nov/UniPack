@@ -10,21 +10,23 @@
 
     /* end initialization */
 
-    #ifndef DLL_EXPORT
+    #ifndef DLL_EXPORT  /* defined(DLL_EXPORT) */
 
-        #ifdef WINDOWS
+        #ifdef __WINDOWS__
 
-            #define DLL_EXPORT __cdecl __declspec( dllexport )
+            #define DLL_EXPORT __cdecl __declspec( dllexport )  /* defined(export for windows) */
 
-        #endif /* defined(export for windows) */
+        #elif __APPLE__
 
-        #ifdef __APPLE__
+            #define DLL_EXPORT __cdecl __attribute__(( visibility( "default" )))  /* defined(export for mac os) */
 
-            #define DLL_EXPORT __cdecl __attribute__(( visibility( "default" )))
+        #else
 
-        #endif /* defined(export for mac os) */
+            #error "OS not supported!"
 
-    #endif /* defined(DLL_EXPORT) */
+        #endif
+
+    #endif /* end define DDL_EXPORT */
 
     /* give information about dll */
 
