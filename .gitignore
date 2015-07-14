@@ -13,7 +13,6 @@ lib/
 *.bak
 Thumbs.db
 
-*.txt
 *.lps
 *.def
 *.depend
