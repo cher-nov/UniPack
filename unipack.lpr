@@ -6,10 +6,12 @@ program unipack;
 uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads, {$ENDIF}{$ENDIF}
-  Classes, SysUtils, CustApp,
+  Classes, SysUtils,
+  CustApp, dynlibs,
   up_methods;
 
-type
+{ –=────────────────────────────────────────────────────────────────────────=– }
+type { ═ TMainApp ──────────────────────────────────────────────────────────── }
 
   TMainApp = class( TCustomApplication )
   const
@@ -21,7 +23,7 @@ type
     destructor Destroy(); override;
   end;
 
-{ TMainApp }
+{ –=────────────────────────────────────────────────────────────────────────=– }
 
 procedure TMainApp.DoRun();
 begin
@@ -46,8 +48,11 @@ begin
     Terminate(); Exit();
   end;
 
+  //loading all available methods libraries
   Terminate();
 end;
+
+{══════════════════════════════════════════════════════════════════════════════}
 
 constructor TMainApp.Create( TheOwner: TComponent );
 begin
@@ -60,12 +65,14 @@ begin
   inherited Destroy();
 end;
 
+{══════════════════════════════════════════════════════════════════════════════}
+
 var
   Application : TMainApp;
 begin
   Application := TMainApp.Create( nil );
   Application.Title := 'UniPack';
-  Application.Run;
-  Application.Free;
+  Application.Run();
+  Application.Free();
 end.
 
