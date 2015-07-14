@@ -63,11 +63,57 @@ type { TUniMethod - UniPack method library ════════════�
     property Version: Integer read FVersion;
   end;
 
+{ –=────────────────────────────────────────────────────────────────────────=– }
+
+var
+  UPMethods: TList;
+
+function GetMethod( AName: TUniMethodName ): TUniMethod;
+function LoadMethodLib( ALibFile: String ): Boolean;
+procedure UnloadAllMethods();
+
 implementation {═══════════════════════════════════════════════════════════════}
 
 uses StrUtils;
 
+function GetMethod( AName: TUniMethodName ): TUniMethod;
+var
+  iter: TListEnumerator;
+begin
+  iter := UPMethods.GetEnumerator();
+  Result := nil;
+  while iter.MoveNext() and ( Result = nil ) do begin
+    Result := TUniMethod( iter.Current );
+    if ( Result.Name <> AName ) then Result := nil;
+  end;
+  iter.Destroy();
+end;
+
+function LoadMethodLib( ALibFile: String ): Boolean;
+var
+  load: TUniMethod;
+begin
+  load := TUniMethod.Create( ALibFile );
+  Result := True;
+  if ( GetMethod( load.Name ) <> nil ) then begin
+    load.Destroy();
+    Result := False;
+  end;
+  if Result then UPMethods.Add( load );
+end;
+
+procedure UnloadAllMethods();
+var
+  i : Integer;
+begin
+  for i := 0 to UPMethods.Count-1 do
+    TUniMethod( UPMethods[i] ).Destroy();
+  UPMethods.Clear();
+end;
+
 { –=────────────────────────────────────────────────────────────────────────=– }
+
+{ ═ TUniMethod ─────────────────────────────────────────────────────────────── }
 
 constructor TUniMethod.Create( ALibFile: String );
 var
@@ -98,6 +144,15 @@ begin
 end;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
+
+initialization {═══════════════════════════════════════════════════════════════}
+
+UPMethods := TList.Create();
+
+finalization {═════════════════════════════════════════════════════════════════}
+
+UnloadAllMethods();
+UPMethods.Destroy();
 
 end.
 
