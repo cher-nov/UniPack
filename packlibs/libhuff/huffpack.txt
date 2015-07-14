@@ -1,7 +1,7 @@
 libhuff - UniPack compression method plugin
 (c) KoDi Studio, 2015
 
-UniPack method ID: HUFF
+UniPack method ID: HUFF (0x46465548)
 
 ════════════════════════════════════════════════════════════════════════════════
 1. Compression technique
