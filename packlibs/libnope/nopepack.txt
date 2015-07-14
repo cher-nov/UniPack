@@ -1,0 +1,18 @@
+libnope - UniPack compression method plugin
+(c) KoDi Studio, 2015
+
+UniPack method ID: NOPE (0x45504F4E)
+
+════════════════════════════════════════════════════════════════════════════════
+1. Compression technique
+
+libnope does NOT compress data in any way. It just copies input data to output
+stream.
+It could be useful for testing purposes or when you do not need any compression.
+
+════════════════════════════════════════════════════════════════════════════════
+2. Output data structure
+
+pkstream  char[*]
+  Data stream without any compression.
+  Stream length coincides with input data size.
