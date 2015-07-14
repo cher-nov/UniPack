@@ -29,8 +29,9 @@ begin
   WriteLn( 'Written by Kodi Studio, 2015' );
 
   if ( ParamCount = 0 ) then begin
-    WriteLn( 'Usage: unipack.exe /[a|u] <-F archive.upa> <-D path> [options]' );
-    WriteLn( '  /a - pack mode, /u - unpack mode' );
+    WriteLn( 'Usage: unipack.exe /[a METHOD|u] <-F archive.upa> <-D path> [options]' );
+    WriteLn( '  /a METHOD - pack mode, METHOD - compression method name' );
+    WriteLn( '  /u - unpack mode' );
     WriteLn( 'Arguments:' );
     WriteLn( '  -F arch.upa' );
     WriteLn( '    a: set output filename as arch.upa' );
@@ -41,8 +42,7 @@ begin
     WriteLn( 'Options:' );
     WriteLn( '  /l - output list of avaliable packing methods and exit' );
     WriteLn( '  /i - output file information and exit' );
-    WriteLn( '  /q - quiet mode (without detailed logging) ' );
-    WriteLn( '  /m METHOD - set compression method, METHOD = NAME:VER' );
+    WriteLn( '  /q - quiet mode (without detailed logging)' );
     Terminate(); Exit();
   end;
 
