@@ -20,6 +20,7 @@ type { ═ TMainApp ────────────────────
     APPVER = '.tech';
   strict private
     procedure LoadMethods( ADir: String );
+    procedure EnumMethods();
   protected
     procedure DoRun(); override;
   public
@@ -35,9 +36,9 @@ begin
   WriteLn( 'Written by Kodi Studio, 2015' );
 
   if ( ParamCount = 0 ) then begin
-    WriteLn( 'Usage: unipack.exe /[a METHOD|u] <-F archive.upa> <-D path> [options]' );
-    WriteLn( '  /a METHOD - pack mode, METHOD - compression method name' );
-    WriteLn( '  /u - unpack mode' );
+    WriteLn( 'Usage: unipack.exe -[a METHOD|u] <-F archive.upa> <-D path> [options]' );
+    WriteLn( '  -a METHOD - pack mode, METHOD - compression method name' );
+    WriteLn( '  -u - unpack mode' );
     WriteLn( 'Arguments:' );
     WriteLn( '  -F arch.upa' );
     WriteLn( '    a: set output filename as arch.upa' );
@@ -46,13 +47,17 @@ begin
     WriteLn( '    a: directory with files to archive' );
     WriteLn( '    u: set output directory for unpacked files' );
     WriteLn( 'Options:' );
-    WriteLn( '  /l - output list of avaliable packing methods and exit' );
-    WriteLn( '  /i - output file information and exit' );
-    WriteLn( '  /q - quiet mode (without detailed logging)' );
+    WriteLn( '  -l - output list of avaliable packing methods and exit' );
+    WriteLn( '  -i - output file information and exit' );
+    WriteLn( '  -q - quiet mode (without detailed logging)' );
     Terminate(); Exit();
   end;
 
   LoadMethods( 'packlibs' );
+  if HasOption('l') then begin
+    EnumMethods();
+    Terminate(); Exit();
+  end;
 
   Terminate();
 end;
@@ -75,12 +80,30 @@ begin
   FindClose( EnumFile );
 end;
 
+//prints list of all available compression methods
+procedure TMainApp.EnumMethods();
+var
+  i : Integer;
+  pack, unpack : Char;
+begin
+  WriteLn( 'METHOD | VERSION | PACK | UNPACK | LIBRARY' );
+    for i := 0 to UPMethods.Count-1 do begin
+      with TUniMethod( UPMethods[i] ) do begin
+        if ( Compress   = nil ) then pack   := '-' else pack   := '+';
+        if ( Decompress = nil ) then unpack := '-' else unpack := '+';
+        WriteLn( Format( '%0:6s | %1:7d | %2:4s | %3:6s | %4:7s',
+                 [Name, Version, pack, unpack, LibFile] ) );
+      end;
+    end;
+end;
+
 {══════════════════════════════════════════════════════════════════════════════}
 
 constructor TMainApp.Create( TheOwner: TComponent );
 begin
   inherited Create( TheOwner );
   StopOnException := True;
+  CaseSensitiveOptions := True;
 end;
 
 destructor TMainApp.Destroy();
