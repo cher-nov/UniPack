@@ -1,14 +1,16 @@
 /*
- HUFF.H
- (c) KoDi studio, 2015
- */
-
+HUFF.H
+(c) KoDi studio, 2015
+*/
+#include "stdafx.h"
 #include "huff.h"
 #include <memory.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <bitset>
 #include <malloc.h>
+
+using namespace std; 
 
 struct symb
 {
@@ -18,6 +20,7 @@ struct symb
 struct res_symb
 {
 	int count;
+	int code_i;
 	int code;
 };
 
@@ -38,7 +41,7 @@ struct node
 
 struct on_node
 {
-	node* child; int fsi;
+	node* child;
 };
 
 FILE* inf;
@@ -46,20 +49,23 @@ FILE* outf;
 code_symb* res;
 res_symb* res_table;
 int curr_i;
+int main_size;
 int temp_d[32];
 code_symb* itog_arr;
+char* inbuf;
 char* buf;
 int n;
 
-void quick_sort(int l, int r, symb* tb);
-void quick_sort_(int l, int r, on_node* tb);
-node* create_tree(symb tb[256], int n);
+void sort_table(int k, symb* tb);
+node* create_tree(symb tb[256]);
 node* nodes_glued(int a, int b, on_node* t);
 void create_code_symb(node* t, int a, int c);
 void input_res(int* m, int c);
 void create_itog_code();
-void quick_sort_itog(int l, int r, code_symb* tb);
-void to_record_data(int size_buf);
+void sort_itog(int k, code_symb* tb);
+void sort_res(int k, res_symb* tb);
+void to_record_data();
+
 
 
 int lib_error = E_OK;
@@ -67,47 +73,54 @@ int lib_compsize = 0;
 
 /* initialization functions */
 
-int get_name()  {
-    return DLL_NAME;
+int get_name() {
+	return DLL_NAME;
 }
 
-int get_version()  {
-    return DLL_VERSION;
+int get_version() {
+	return DLL_VERSION;
 }
 
 /* compress functions */
 
-void* compress(void* data, int size_data)  {
-    /* check errors */
-    if (data == NULL)  {
-        lib_error = E_BAD_INPUT;
-        return NULL;
-    }
-    if (lib_compsize != 0) {
-        lib_error = E_LOST_SIZE;
-        return NULL;
-    }
-    
-    /* compress alogorithm Huffman by Dima */
+void* compress(void* data, int size_data) {
+	/* check errors */
+	if (data == NULL) {
+		lib_error = E_BAD_INPUT;
+		return NULL;
+	}
+	if (lib_compsize != 0) {
+		lib_error = E_LOST_SIZE;
+		return NULL;
+	}
+
+	/* compress alogorithm Huffman by Dima */
+
+	main_size = size_data;
 	symb table[256]{ 0, 0 };
 	int table_freq[256]{ 0 };
+	inbuf = (char*)data;
 	unsigned char t;
 	int x = 0;
 	while (x < size_data)
 	{
-		t = (unsigned char)((*data)[x]);
-		x++;
+		t = inbuf[x];
 		table[(int)t].freq++;
 		table[(int)t].code = (int)t;
 		table_freq[(int)t]++;
+		x++;
 	}
-	quick_sort(0, 255, table);
+	for (int i = 0; i < 256; i++)
+	{
+		if (table[i].freq != 0) n++;
+	}
+	sort_table(256, table);
 	n = 0;
 	for (int i = 0; i < 256; i++)
 	{
 		if (table[i].freq != 0) n++;
 	}
-	node* tree = create_tree(table, n);
+	node* tree = create_tree(table);
 	res = (code_symb*)malloc(n*sizeof(code_symb));
 	curr_i = 0;
 	create_code_symb(tree[0].left, 0, 1);
@@ -123,48 +136,69 @@ void* compress(void* data, int size_data)  {
 		}
 	}
 	g = (g + 8 - g % 8) / 8;
-	buf = (char*)malloc((g)*sizeof(char) + 256 * sizeof(char));
-
-	//output data
+	buf = (char*)malloc(g*sizeof(char) + 256 * sizeof(char));
 	for (int i = 0; i < 256; i++)
 	{
-		buf[i] = res_table[i].count;
+		buf[i] = (unsigned char)res_table[i].count;
 	}
-	to_record_data(size_data);
-    /* code here */
-    lib_compsize = size_data;
-    return *buf;
+	to_record_data();
+	fclose(inf);
+	fclose(outf);
+	inf = fopen("out.txt", "rb");
+	fclose(inf);
+
+	/* code here */
+	lib_compsize = size_data;
+	return (void*)buf;
 }
 
-void* decompress(void* data, int size_data, int out_size)  {
-    /*check errors */
-    if (data == NULL)  {
-        lib_error = E_BAD_INPUT;
-        return NULL;
-    }
-    
-    /* decompress algorithm Huffman by Dima */
-    
-    /* code here */
-    
-    return 0;
-    
+void* decompress(void* data, int size_data, int out_size) {
+	/*check errors */
+	if (data == NULL) {
+		lib_error = E_BAD_INPUT;
+		return NULL;
+	}
+
+	/* decompress algorithm Huffman by Dima */
+
+	/* code here */
+
+	return 0;
+
 }
 
+/* errors functions */
 
-void to_record_data(int size_buf)/
+int get_err() {
+	int err = lib_error;
+	lib_error = E_OK;
+	return err;
+}
+
+char* err_str(int a_error) {
+	switch (a_error) {
+	case E_OK:
+		return "no errors";
+	case E_BAD_INPUT:
+		return "wrong input data";
+	case E_LOST_SIZE:
+		return "take off your data size";
+	}
+	return "unknown error";
+}
+
+void to_record_data()
 {
 	char ct = 0;
-	int cx = 0;
+	int x = 0;
 	char a = 99;
 	int curr_i = 0;
 	int curr_bit = 0; int curr_byte = 257;
 	unsigned char t = 0;
 	buf[curr_byte - 1] = 0;
-	while (cx < size_buf)
+	while (x < main_size)
 	{
-		t = (unsigned char)((*data)[cx]);
-		cx++;
+		t = inbuf[x];
 		int j = (int)t;
 		ct = res_table[j].code;
 		curr_i = res_table[j].count - 1;
@@ -184,40 +218,41 @@ void to_record_data(int size_buf)/
 				curr_bit++;
 			}
 		}
+		x++;
 	}
 }
 
-void create_itog_code() //составление таблицы символов (itog_ arr) и их итоговых кодов(коды сост. по количеству бит требуемых для записи)
-{                       //оставление таблицы всех символов (res_table) с количеством бит для записи
-	quick_sort_itog(0, n - 1, res);
+void create_itog_code()
+{                     
+	sort_itog(n, res);
 	int curr_count = res[0].count;
-	itog_arr[0].count = curr_count;
+	itog_arr[0].count = res[0].count;
 	itog_arr[0].code = res[0].code;
 	itog_arr[0].code2 = 0;
 	char b = 0;
 	int q = 0;
 	for (int i = 1; i < n; i++)
 	{
-		if (curr_count == res[i].count)
+		if (res[i - 1].count == res[i].count)
 		{
 			itog_arr[i].code = res[i].code;
 			itog_arr[i].code2 = itog_arr[i - 1].code2 + 1;
-			itog_arr[i].count = curr_count;
+			itog_arr[i].count = res[i].count;
 		}
 		else
 		{
-			curr_count++;
 			itog_arr[i].code = res[i].code;
-			itog_arr[i].code2 = (itog_arr[i - 1].code2 + 1) << 1;
-			itog_arr[i].count = curr_count;
+			itog_arr[i].code2 = (itog_arr[i - 1].code2 + 1) << (res[i].count - res[i - 1].count);
+			itog_arr[i].count = res[i].count;
 		}
 	}
 	delete(res);
 	res_table = (res_symb*)malloc(256 * sizeof(res_symb));
 	for (int i = 0; i < n; i++)
 	{
-		res_table[(int)(itog_arr[i].code)].count = itog_arr[i].count;
-		res_table[(int)(itog_arr[i].code)].code = itog_arr[i].code2;
+		res_table[(int)itog_arr[i].code].count = itog_arr[i].count;
+		res_table[(int)itog_arr[i].code].code_i = itog_arr[i].code;
+		res_table[(int)itog_arr[i].code].code = itog_arr[i].code2;
 	}
 	for (int i = 0; i < 256; i++)
 		if (res_table[i].count < 0)
@@ -236,18 +271,10 @@ void create_code_symb(node* t, int a, int c)
 		if (t->code != -1)
 		{
 			int b = 0;
-			int q = 0;
-			for (int i = 0; i < c; i++)
-			{
-				if (temp_d[i]) b = (b + 1) << 1;
-				else b = b << 1;
-				q++;
-			}
-			b = b >> 1;
-			res[curr_i].code2 = b;
 			res[curr_i].code = t->code;
 			res[curr_i].count = c;
 			curr_i++;
+			return;
 		}
 		else
 		{
@@ -257,7 +284,7 @@ void create_code_symb(node* t, int a, int c)
 	}
 }
 
-node* create_tree(symb tb[256], int n)
+node* create_tree(symb tb[256])
 {
 	on_node* ttree = (on_node*)malloc(n*sizeof(on_node));
 	for (int i = 256 - n; i < 256; i++)
@@ -274,7 +301,14 @@ node* create_tree(symb tb[256], int n)
 	while (new_n != 0)
 	{
 		ttree[new_n - 1].child = nodes_glued(new_n - 1, new_n, ttree);
-		quick_sort_(0, n - 1, ttree);
+		for (int i = new_n - 1; i > 0; i--)
+		{
+			if (ttree[i].child->freq > ttree[i - 1].child->freq)
+			{
+				swap(ttree[i], ttree[i - 1]);
+			}
+			else break;
+		}
 		int a;
 		new_n--;
 	}
@@ -308,100 +342,44 @@ node* nodes_glued(int a, int b, on_node* t)
 	return temp;
 }
 
-void quick_sort(int l, int r, symb* tb)
+void sort_table(int k, symb* tb)
 {
-	double m = tb[l + (r - l) / 2].freq;
-	int i = l;
-	int j = r;
-	while (i <= j)
-	{
-		while (tb[i].freq < m) i++;
-		while (tb[j].freq > m) j--;
-		if (i <= j)
-		{
-			if (tb[i].freq > tb[j].freq) swap(tb[i], tb[j]);
-			i++;
-			j--;
+	for (int j = 0; j < k - 1; j++) {
+		for (int i = 0; i < k - 1 - j; i++) {
+			if (tb[i].freq > tb[i + 1].freq || tb[i].freq > tb[i + 1].freq && tb[i].code < tb[i + 1].code) {
+				symb b = tb[i];
+				tb[i] = tb[i + 1];
+				tb[i + 1] = b;
+			}
 		}
 	}
-	if (i < r)
-	{
-		quick_sort(i, r, tb);
-	}
-	if (l < j)
-	{
-		quick_sort(l, j, tb);
-	}
 }
 
-void quick_sort_(int l, int r, on_node* tb)
+void sort_itog(int k, code_symb* tb)
 {
-	double m = (tb[l + (r - l) / 2].child)->freq;
-	int i = l;
-	int j = r;
-	while (i <= j)
-	{
-		while (tb[i].child->freq > m) i++;
-		while (tb[j].child->freq < m) j--;
-		if (i <= j)
-		{
-			if (tb[i].child->freq < tb[j].child->freq) swap(tb[i], tb[j]);
-			i++;
-			j--;
+	for (int j = 0; j < k - 1; j++) {
+		for (int i = 0; i < k - 1 - j; i++) {
+			if (tb[i].count > tb[i + 1].count || tb[i].count == tb[i + 1].count && tb[i].code > tb[i + 1].code) {
+				code_symb b = tb[i];
+				tb[i] = tb[i + 1];
+				tb[i + 1] = b;
+			}
 		}
 	}
-	if (i < r)
-	{
-		quick_sort_(i, r, tb);
-	}
-	if (l < j)
-	{
-		quick_sort_(l, j, tb);
-	}
 }
 
-void quick_sort_itog(int l, int r, code_symb* tb)
+void sort_res(int k, res_symb* tb)
 {
-	double m = tb[l + (r - l) / 2].count;
-	int i = l;
-	int j = r;
-	while (i <= j)
-	{
-		while (tb[i].count < m) i++;
-		while (tb[j].count > m) j--;
-		if (i <= j)
-		{
-			if (tb[i].count > tb[j].count) swap(tb[i], tb[j]);
-			i++;
-			j--;
+	for (int j = 0; j < k - 1; j++) {
+		for (int i = 0; i < k - 1 - j; i++) {
+			if (tb[i].count > tb[i + 1].count || tb[i].count > tb[i + 1].count && tb[i].code_i < tb[i + 1].code_i) {
+				res_symb b = tb[i];
+				tb[i] = tb[i + 1];
+				tb[i + 1] = b;
+			}
 		}
 	}
-	if (i < r)
-	{
-		quick_sort_itog(i, r, tb);
-	}
-	if (l < j)
-	{
-		quick_sort_itog(l, j, tb);
-	}
 }
 
-/* errors functions */
 
-int get_err() {
-    int err = lib_error;
-    lib_error = E_OK;
-    return err;
-}
 
-char* err_str(int a_error)  {
-    switch (a_error)  {
-        case E_OK:
-            return "no errors";
-        case E_BAD_INPUT:
-            return "wrong input data";
-        case E_LOST_SIZE:
-            return "take off your data size";
-    }
-    return "unknown error";
-}
