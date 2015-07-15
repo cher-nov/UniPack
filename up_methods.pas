@@ -76,6 +76,11 @@ implementation {═════════════════════�
 
 uses StrUtils;
 
+var
+  LoadError : Boolean = False;
+
+{ –=────────────────────────────────────────────────────────────────────────=– }
+
 function GetMethod( AName: TUniMethodName ): TUniMethod;
 var
   iter: TListEnumerator;
@@ -95,11 +100,14 @@ var
 begin
   load := TUniMethod.Create( ALibFile );
   Result := True;
-  if ( GetMethod( load.Name ) <> nil ) then begin
+
+  if LoadError                         then Result := False else
+  if ( GetMethod( load.Name ) <> nil ) then Result := False;
+
+  if Result then
+    UPMethods.Add( load )
+  else
     load.Destroy();
-    Result := False;
-  end;
-  if Result then UPMethods.Add( load );
 end;
 
 procedure UnloadAllMethods();
@@ -124,6 +132,11 @@ begin
   FLibFile := ExtractFileName( ALibFile );
   FLibrary := LoadLibrary( ALibFile );
 
+  if ( FLibrary = NilHandle ) then begin
+    LoadError := True;
+    Exit;
+  end;
+
   MCompress := TUniPackCompress( GetProcedureAddress( FLibrary, 'compress' ) );
   MCompSize := TUniPackCompSize( GetProcedureAddress( FLibrary, 'compsize' ) );
   MDecompress := TUniPackDecompress( GetProcedureAddress( FLibrary, 'decompress' ) );
@@ -136,6 +149,8 @@ begin
   
   MGetVersion := TUniPackGetVersion( GetProcedureAddress( FLibrary, 'get_version' ) );
   FVersion := MGetVersion();
+
+  LoadError := False;
 end;
 
 destructor TUniMethod.Destroy();

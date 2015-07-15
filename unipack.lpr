@@ -13,9 +13,13 @@ uses
 { –=────────────────────────────────────────────────────────────────────────=– }
 type { ═ TMainApp ──────────────────────────────────────────────────────────── }
 
+  { TMainApp }
+
   TMainApp = class( TCustomApplication )
   const
     APPVER = '.tech';
+  strict private
+    procedure LoadMethods( ADir: String );
   protected
     procedure DoRun(); override;
   public
@@ -48,8 +52,27 @@ begin
     Terminate(); Exit();
   end;
 
-  //loading all available methods libraries
+  LoadMethods( 'packlibs' );
+
   Terminate();
+end;
+
+{ –=────────────────────────────────────────────────────────────────────────=– }
+
+//loading all available methods libraries
+procedure TMainApp.LoadMethods( ADir: String );
+var
+  EnumFile : TSearchRec;
+begin
+  ADir := Location + IncludeTrailingPathDelimiter( ADir );
+  if ( FindFirst( ADir+'*.'+SharedSuffix, faAnyFile, EnumFile ) = 0 ) then begin
+    repeat
+      if not LoadMethodLib( ADir+EnumFile.Name ) then
+        WriteLn( 'ERROR: unable to load method library: ', EnumFile.Name );
+    until ( FindNext( EnumFile ) <> 0 );
+  end else
+    WriteLn( 'WARNING: no methods libraries are found.' );
+  FindClose( EnumFile );
 end;
 
 {══════════════════════════════════════════════════════════════════════════════}
