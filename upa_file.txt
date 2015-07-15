@@ -1,5 +1,5 @@
 UniPack Archive (UPA) Format Specification
-14.07.2015 (d.m.y)
+15.07.2015 (d.m.y)
 
 ════════════════════════════════════════════════════════════════════════════════
 1. GENERAL INFO
@@ -37,14 +37,22 @@ FAT entry #count
 
 2.1) FAT ENTRY
 
-fn_len    char
+fn_len    unsigned char
   zero-based filename length (i.e. 0 means 1, 255 means 256 etc.)
 filename  char[fn_len]
   filename (max length is 256 as in NTFS standard)
 packsize  unsigned long long int
-  packed file data size
+  packed file data size (if solid archive, must be 0)
 origsize  unsigned long long int
   original (non-packed) file size
+fileattr  unsigned char
+  file attributes flags, bits numbered as 76543210
+  bit 0 - read-only
+  bit 1 - hidden
+  bit 2 - system
+  bit 3 - archive
+filedate  int
+  last file editing date in POSIX format (if -1, should not be used)
 
 3.0) PACKED DATA STREAM
 
