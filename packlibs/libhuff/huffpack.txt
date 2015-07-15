@@ -14,7 +14,7 @@ Output data contains compressed data stream itself and some auxiliary info.
 
 table     unsigned char[256]
   Codes lengths table. Every byte value represents length of code, in bits, for
-  ASCII character with corresponding index.
+  ASCII character with corresponding zero-based index.
 
 pkstream  char[*]
   Compressed data stream. Could contain unused zero bits at the end to round up
