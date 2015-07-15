@@ -83,15 +83,14 @@ var
 
 function GetMethod( AName: TUniMethodName ): TUniMethod;
 var
-  iter: TListEnumerator;
+  i : Integer;
 begin
-  iter := UPMethods.GetEnumerator();
   Result := nil;
-  while iter.MoveNext() and ( Result = nil ) do begin
-    Result := TUniMethod( iter.Current );
+  for i := 0 to UPMethods.Count-1 do begin
+    if Assigned(Result) then Break;
+    Result := TUniMethod( UPMethods[i] );
     if ( Result.Name <> AName ) then Result := nil;
   end;
-  iter.Destroy();
 end;
 
 function LoadMethodLib( ALibFile: String ): Boolean;
