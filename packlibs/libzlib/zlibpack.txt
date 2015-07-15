@@ -1,0 +1,15 @@
+libzlib - UniPack compression method plugin
+(c) KoDi Studio, 2015
+
+UniPack method ID: ZLIB (0x42494C5A)
+
+════════════════════════════════════════════════════════════════════════════════
+1. Compression technique
+
+libzlib is a wrapper around zLib (libz) compression library.
+
+════════════════════════════════════════════════════════════════════════════════
+2. Additional information
+
+http://www.zlib.net/
+http://www.zlib.net/manual.html
