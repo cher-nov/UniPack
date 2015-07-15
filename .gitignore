@@ -17,3 +17,6 @@ Thumbs.db
 *.def
 *.depend
 *.layout
+
+# Exceptions
+!libz.a
