@@ -31,6 +31,8 @@ type { Auxiliary types for TUniMethod ══════════════
     function(): Integer; cdecl;
   TUniPackErrStr =
     function( errlev: Integer ): PChar; cdecl;
+  TUniPackFreeMem =
+    procedure( ptr: Pointer ); cdecl;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
 type { TUniMethod - UniPack method library ═══════════════════════════════════ }
@@ -43,6 +45,7 @@ type { TUniMethod - UniPack method library ════════════�
     MDecompress : TUniPackDecompress;
     MGetErr : TUniPackGetErr;
     MErrStr : TUniPackErrStr;
+    MFreeMem : TUniPackFreeMem;
     //variables
     FLibrary : TLibHandle;
     FLibFile : String;
@@ -57,6 +60,7 @@ type { TUniMethod - UniPack method library ════════════�
     property Decompress: TUniPackDecompress read MDecompress;
     property GetErr: TUniPackGetErr read MGetErr;
     property ErrStr: TUniPackErrStr read MErrStr;
+    property FreeMem: TUniPackFreeMem read MFreeMem;
 
     property LibFile: String read FLibFile;
     property Name: TUniMethodName read FName;
@@ -144,14 +148,16 @@ begin
   MCompress := TUniPackCompress( GetProcedureAddress( FLibrary, 'compress' ) );
   MCompSize := TUniPackCompSize( GetProcedureAddress( FLibrary, 'compsize' ) );
   MDecompress := TUniPackDecompress( GetProcedureAddress( FLibrary, 'decompress' ) );
-  MGetErr := TUniPackGetErr( GetProcedureAddress( FLibrary, 'get_err' ) );
-  MErrStr := TUniPackErrStr( GetProcedureAddress( FLibrary, 'err_str' ) );
 
   //alternative syntax for compress() and decompress()
   if ( MCompress = nil ) then
     MCompress := TUniPackCompress( GetProcedureAddress( FLibrary, 'up_pack' ) );
   if ( MDecompress = nil ) then
     MDecompress := TUniPackDecompress( GetProcedureAddress( FLibrary, 'up_unpack' ) );
+
+  MGetErr := TUniPackGetErr( GetProcedureAddress( FLibrary, 'get_err' ) );
+  MErrStr := TUniPackErrStr( GetProcedureAddress( FLibrary, 'err_str' ) );
+  MFreeMem := TUniPackFreeMem( GetProcedureAddress( FLibrary, 'free_mem' ) );
 
   MGetVersion := TUniPackGetVersion( GetProcedureAddress( FLibrary, 'get_version' ) );
   FVersion := MGetVersion();

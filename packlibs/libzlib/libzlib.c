@@ -70,3 +70,9 @@ int get_err() {
 const char* err_str( int a_error ) {
   return z_zError( a_error );
 }
+
+/* additional */
+
+void free_mem( void* ptr ) {
+  free( ptr );
+}

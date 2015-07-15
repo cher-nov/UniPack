@@ -31,5 +31,6 @@ DLL_EXPORT void* up_unpack( void*, int, int );
 
 DLL_EXPORT int get_err();
 DLL_EXPORT const char* err_str( int );
+DLL_EXPORT void free_mem( void* ptr );
 
 #endif // __LIBZLIB_H__

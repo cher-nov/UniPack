@@ -65,3 +65,9 @@ char* err_str( int a_error ) {
   }
   return "unknown error";
 }
+
+/* additional */
+
+void free_mem( void* ptr ) {
+  free( ptr );
+}

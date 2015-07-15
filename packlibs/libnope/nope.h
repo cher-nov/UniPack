@@ -35,5 +35,6 @@ DLL_EXPORT void* decompress( void*, int, int );
 
 DLL_EXPORT int get_err();
 DLL_EXPORT char* err_str( int );
+DLL_EXPORT void free_mem( void* ptr );
 
 #endif // __NOPE_H__
