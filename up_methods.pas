@@ -147,6 +147,12 @@ begin
   MGetErr := TUniPackGetErr( GetProcedureAddress( FLibrary, 'get_err' ) );
   MErrStr := TUniPackErrStr( GetProcedureAddress( FLibrary, 'err_str' ) );
 
+  //alternative syntax for compress() and decompress()
+  if ( MCompress = nil ) then
+    MCompress := TUniPackCompress( GetProcedureAddress( FLibrary, 'up_pack' ) );
+  if ( MDecompress = nil ) then
+    MDecompress := TUniPackDecompress( GetProcedureAddress( FLibrary, 'up_unpack' ) );
+
   MGetVersion := TUniPackGetVersion( GetProcedureAddress( FLibrary, 'get_version' ) );
   FVersion := MGetVersion();
 
