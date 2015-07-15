@@ -128,13 +128,13 @@ begin
   FLibrary := LoadLibrary( ALibFile );
 
   if ( FLibrary = NilHandle ) then begin
-    LoadError := True;
+    UPLoadError := True;
     Exit;
   end;
 
   MGetName := TUniPackGetName( GetProcedureAddress( FLibrary, 'get_name' ) );
   if ( MGetName = nil ) then begin
-    LoadError := True;
+    UPLoadError := True;
     Exit;
   end;
 
@@ -150,7 +150,7 @@ begin
   MGetVersion := TUniPackGetVersion( GetProcedureAddress( FLibrary, 'get_version' ) );
   FVersion := MGetVersion();
 
-  LoadError := False;
+  UPLoadError := False;
 end;
 
 destructor TUniMethod.Destroy();
