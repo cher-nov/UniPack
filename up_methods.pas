@@ -67,6 +67,7 @@ type { TUniMethod - UniPack method library ════════════�
 
 var
   UPMethods: TList;
+  UPLoadError : Boolean = False;
 
 function GetMethod( AName: TUniMethodName ): TUniMethod;
 function LoadMethodLib( ALibFile: String ): Boolean;
@@ -75,9 +76,6 @@ procedure UnloadAllMethods();
 implementation {═══════════════════════════════════════════════════════════════}
 
 uses StrUtils;
-
-var
-  LoadError : Boolean = False;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
 
@@ -100,7 +98,7 @@ begin
   load := TUniMethod.Create( ALibFile );
   Result := True;
 
-  if LoadError                         then Result := False else
+  if UPLoadError                       then Result := False else
   if ( GetMethod( load.Name ) <> nil ) then Result := False;
 
   if Result then
@@ -134,16 +132,21 @@ begin
     Exit;
   end;
 
+  MGetName := TUniPackGetName( GetProcedureAddress( FLibrary, 'get_name' ) );
+  if ( MGetName = nil ) then begin
+    LoadError := True;
+    Exit;
+  end;
+
+  NameInt := MGetName();
+  FName := ReverseString( LeftStr( PChar(@NameInt), UP_NAMELEN ) );
+
   MCompress := TUniPackCompress( GetProcedureAddress( FLibrary, 'compress' ) );
   MCompSize := TUniPackCompSize( GetProcedureAddress( FLibrary, 'compsize' ) );
   MDecompress := TUniPackDecompress( GetProcedureAddress( FLibrary, 'decompress' ) );
   MGetErr := TUniPackGetErr( GetProcedureAddress( FLibrary, 'get_err' ) );
   MErrStr := TUniPackErrStr( GetProcedureAddress( FLibrary, 'err_str' ) );
 
-  MGetName := TUniPackGetName( GetProcedureAddress( FLibrary, 'get_name' ) );
-  NameInt := MGetName();
-  FName := ReverseString( LeftStr( PChar(@NameInt), UP_NAMELEN ) );
-  
   MGetVersion := TUniPackGetVersion( GetProcedureAddress( FLibrary, 'get_version' ) );
   FVersion := MGetVersion();
 
