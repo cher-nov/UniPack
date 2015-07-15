@@ -41,6 +41,9 @@
 		<Compiler>
 			<Add option="-std=c99" />
 		</Compiler>
+		<Linker>
+			<Add option="-static-libgcc" />
+		</Linker>
 		<Unit filename="nope.c">
 			<Option compilerVar="CC" />
 		</Unit>
