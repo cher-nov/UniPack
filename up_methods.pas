@@ -32,6 +32,8 @@ type { Auxiliary types for TUniMethod ══════════════
     function(): Integer; cdecl;
   TUniPackErrStr =
     function( errlev: Integer ): PChar; cdecl;
+  TUniPackReallocMem =
+    function( ptr: Pointer; size: SizeUInt ): Pointer; cdecl;
   TUniPackFreeMem =
     procedure( ptr: Pointer ); cdecl;
 
@@ -46,6 +48,7 @@ type { TUniMethod - UniPack method library ════════════�
     MDecompress : TUniPackDecompress;
     MGetErr : TUniPackGetErr;
     MErrStr : TUniPackErrStr;
+    MReallocMem : TUniPackReallocMem;
     MFreeMem : TUniPackFreeMem;
     //variables
     FLibrary : TLibHandle;
@@ -61,6 +64,7 @@ type { TUniMethod - UniPack method library ════════════�
     property Decompress: TUniPackDecompress read MDecompress;
     property GetErr: TUniPackGetErr read MGetErr;
     property ErrStr: TUniPackErrStr read MErrStr;
+    property ReallocMem: TUniPackReallocMem read MReallocMem;
     property FreeMem: TUniPackFreeMem read MFreeMem;
 
     property LibFile: String read FLibFile;
@@ -162,6 +166,8 @@ begin
 
   MGetErr := TUniPackGetErr( GetProcedureAddress( FLibrary, 'get_err' ) );
   MErrStr := TUniPackErrStr( GetProcedureAddress( FLibrary, 'err_str' ) );
+
+  MReallocMem := TUniPackReallocMem( GetProcedureAddress( FLibrary, 'realloc_mem' ) );
   MFreeMem := TUniPackFreeMem( GetProcedureAddress( FLibrary, 'free_mem' ) );
 
   MGetVersion := TUniPackGetVersion( GetProcedureAddress( FLibrary, 'get_version' ) );
