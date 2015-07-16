@@ -44,17 +44,20 @@ struct on_node
 	node* child;
 };
 
-FILE* inf;
-FILE* outf;
+unsigned long long insize, outsize;
+
+/*  Compress variables  */
+
 code_symb* res;
 res_symb* res_table;
 int curr_i;
-int main_size;
-int temp_d[32];
+int temp_d[64];
 code_symb* itog_arr;
 char* inbuf;
-char* buf;
+char* outbuf;
 int n;
+
+/*  Compression functions  */
 
 void sort_table(int k, symb* tb);
 node* create_tree(symb tb[256]);
@@ -65,6 +68,21 @@ void create_itog_code();
 void sort_itog(int k, code_symb* tb);
 void sort_res(int k, res_symb* tb);
 void to_record_data();
+
+/*  Decompress variables  */
+
+code_symb* intable;
+int curr_counter;
+int curr_it;
+char curr_symb;
+node* encoding_tree;
+int count_readed;
+
+/*  Decompress function  */
+
+void reading_data();
+node* input_node(node* next, int symb, int j, int c);
+void dfs(node* next);
 
 
 
@@ -96,7 +114,7 @@ void* compress(void* data, int size_data) {
 
 	/* compress alogorithm Huffman by Dima */
 
-	main_size = size_data;
+	insize = size_data;
 	symb table[256]{ 0, 0 };
 	int table_freq[256]{ 0 };
 	inbuf = (char*)data;
@@ -110,10 +128,6 @@ void* compress(void* data, int size_data) {
 		table_freq[(int)t]++;
 		x++;
 	}
-	for (int i = 0; i < 256; i++)
-	{
-		if (table[i].freq != 0) n++;
-	}
 	sort_table(256, table);
 	n = 0;
 	for (int i = 0; i < 256; i++)
@@ -123,11 +137,20 @@ void* compress(void* data, int size_data) {
 	node* tree = create_tree(table);
 	res = (code_symb*)malloc(n*sizeof(code_symb));
 	curr_i = 0;
-	create_code_symb(tree[0].left, 0, 1);
-	create_code_symb(tree[0].right, 1, 1);
+	if (tree[0].left == NULL && tree[0].right == NULL)
+	{
+		res[0].code2 = 0;
+		res[0].code = tree[0].code;
+		res[0].count = tree[0].freq;
+	}
+	else
+	{
+		create_code_symb(tree[0].left, 0, 1);
+		create_code_symb(tree[0].right, 1, 1);
+	}
 	itog_arr = (code_symb*)malloc(n*sizeof(code_symb));
 	create_itog_code();
-	int g = 0;
+	unsigned long long g = 0;
 	for (int i = 0; i < 256; i++)
 	{
 		if (res_table[i].count > 0)
@@ -136,20 +159,14 @@ void* compress(void* data, int size_data) {
 		}
 	}
 	g = (g + 8 - g % 8) / 8;
-	buf = (char*)malloc(g*sizeof(char) + 256 * sizeof(char));
+	outbuf = (char*)malloc(g*sizeof(char) + 256 * sizeof(char));
 	for (int i = 0; i < 256; i++)
 	{
-		buf[i] = (unsigned char)res_table[i].count;
+		outbuf[i] = (unsigned char)res_table[i].count;
 	}
 	to_record_data();
-	fclose(inf);
-	fclose(outf);
-	inf = fopen("out.txt", "rb");
-	fclose(inf);
-
-	/* code here */
 	lib_compsize = size_data;
-	return (void*)buf;
+	return (void*)outbuf;
 }
 
 void* decompress(void* data, int size_data, int out_size) {
@@ -158,13 +175,11 @@ void* decompress(void* data, int size_data, int out_size) {
 		lib_error = E_BAD_INPUT;
 		return NULL;
 	}
-
-	/* decompress algorithm Huffman by Dima */
-
-	/* code here */
-
-	return 0;
-
+	inbuf = (char*)data;
+	insize = size_data;
+	outsize = out_size;
+	reading_data();
+	return (void*)outbuf;
 }
 
 /* errors functions */
@@ -187,6 +202,8 @@ char* err_str(int a_error) {
 	return "unknown error";
 }
 
+/*  Comress  */
+
 void to_record_data()
 {
 	char ct = 0;
@@ -195,8 +212,8 @@ void to_record_data()
 	int curr_i = 0;
 	int curr_bit = 0; int curr_byte = 257;
 	unsigned char t = 0;
-	buf[curr_byte - 1] = 0;
-	while (x < main_size)
+	outbuf[curr_byte - 1] = 0;
+	while (x < insize)
 	{
 		t = inbuf[x];
 		int j = (int)t;
@@ -207,13 +224,13 @@ void to_record_data()
 			if (curr_bit > 7)
 			{
 				curr_byte++;
-				buf[curr_byte - 1] = 0;
+				outbuf[curr_byte - 1] = 0;
 				curr_bit = 0;
 			}
 			else
 			{
-				if (bitset<1>(ct >> curr_i) == 1) buf[curr_byte - 1] |= 1 << curr_bit;
-				else buf[curr_byte - 1] |= 0 << curr_bit;
+				if (bitset<1>(ct >> curr_i) == 1) outbuf[curr_byte - 1] |= 1 << curr_bit;
+				else outbuf[curr_byte - 1] |= 0 << curr_bit;
 				curr_i--;
 				curr_bit++;
 			}
@@ -225,7 +242,6 @@ void to_record_data()
 void create_itog_code()
 {                     
 	sort_itog(n, res);
-	int curr_count = res[0].count;
 	itog_arr[0].count = res[0].count;
 	itog_arr[0].code = res[0].code;
 	itog_arr[0].code2 = 0;
@@ -247,7 +263,7 @@ void create_itog_code()
 		}
 	}
 	delete(res);
-	res_table = (res_symb*)malloc(256 * sizeof(res_symb));
+	res_table = (res_symb*)malloc(256*sizeof(res_symb));
 	for (int i = 0; i < n; i++)
 	{
 		res_table[(int)itog_arr[i].code].count = itog_arr[i].count;
@@ -341,6 +357,122 @@ node* nodes_glued(int a, int b, on_node* t)
 	}
 	return temp;
 }
+
+/*  Decompress  */
+
+void reading_data()
+{
+	int x = 0;
+	int c_not0 = 0;
+	intable = (code_symb*)malloc(256 * sizeof(code_symb));
+	unsigned char t;
+	while (x < 256)
+	{
+		intable[x].count = (int)inbuf[x];
+		intable[x].code = x;
+		if (intable[x].count != 0) c_not0++;
+		x++;
+	}
+	sort_itog(256, intable);
+	encoding_tree = (node*)malloc(sizeof(node));
+	encoding_tree[0].left = NULL;
+	encoding_tree[0].right = NULL;
+	encoding_tree[0].freq = 0;
+	int curr_i = 256 - c_not0;
+	int curr_c = intable[curr_i].count;
+	intable[256 - c_not0].code2 = 0;
+	for (int i = 257 - c_not0; i < 256; i++)
+	{
+		if (intable[i - 1].count == intable[i].count) intable[i].code2 = intable[i - 1].code2 + 1;
+		else intable[i].code2 = (intable[i - 1].code2 + 1) << (intable[i].count - intable[i - 1].count);
+	}
+	for (int i = 0; i < 256; i++)
+	{
+		if (intable[i].count != 0)
+		{
+			if (bitset<1>(intable[i].code2 >> intable[i].count - 1) == 1) encoding_tree[0].right = input_node(encoding_tree[0].right, intable[i].code,
+				intable[i].code2, intable[i].count - 1);
+			else encoding_tree[0].left = input_node(encoding_tree[0].left, intable[i].code, intable[i].code2, intable[i].count - 1);
+		}
+	}
+	curr_counter = 0;
+	curr_it = 0;
+	curr_symb = inbuf[256];
+	count_readed = 0;
+	while (curr_counter < insize && count_readed < outsize)
+	{
+		if (curr_it > 7)
+		{
+			curr_it = 0;
+			curr_counter++;
+			curr_symb = inbuf[curr_counter + 256];
+		}
+		if (bitset<1>(curr_symb >> curr_it) == 1) dfs(encoding_tree[0].right);
+		else dfs(encoding_tree[0].left);
+	}
+}
+
+void dfs(node* next)
+{
+	if (curr_counter >= insize || count_readed >= outsize) return;
+	curr_it++;
+	if (next->code != -1)
+	{
+		outbuf[count_readed] = (char)next->code;
+		count_readed++;
+		return;
+	}
+	else
+	{
+		if (curr_it > 7)
+		{
+			curr_it = 0;
+			curr_counter++;
+			curr_symb = inbuf[curr_counter + 256];
+			if (bitset<1>(curr_symb >> curr_it) == 1) dfs(next->right);
+			else dfs(next->left);
+		}
+		else
+		{
+			if (bitset<1>(curr_symb >> curr_it) == 1) dfs(next->right);
+			else dfs(next->left);
+		}
+	}
+}
+
+node* input_node(node* next, int symb, int j, int c)
+{
+	node* temp = NULL;
+	if (!next)
+	{
+		temp = (node*)malloc(sizeof(node));
+		temp->code = -1;
+		temp->left = temp->right = NULL;
+		temp->freq = 0;
+	}
+	if (c == 0)
+	{
+		temp->code = symb;
+		return temp;
+	}
+	else
+	{
+		if (!next)
+		{
+			if (bitset<1>(j >> c - 1) == 1) temp->right = input_node(temp->right, symb, j, c - 1);
+			else temp->left = input_node(temp->left, symb, j, c - 1);
+			return temp;
+		}
+		else
+		{
+			if (bitset<1>(j >> c - 1) == 1) next->right = input_node(next->right, symb, j, c - 1);
+			else next->left = input_node(next->left, symb, j, c - 1);
+			return next;
+		}
+	}
+}
+
+/*  Sort functions  */
 
 void sort_table(int k, symb* tb)
 {
