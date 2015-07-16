@@ -1,16 +1,16 @@
 /*
-HUFF.H
-(c) KoDi studio, 2015
+  libhuff.cpp
+  (c) KoDi studio, 2015
 */
-#include "stdafx.h"
-#include "huff.h"
-#include <memory.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <bitset>
-#include <malloc.h>
 
-using namespace std; 
+#include <stdlib.h>
+#include <stdio.h>
+#include <memory.h>
+#include <malloc.h>
+#include <bitset>
+#include "libhuff.h"
+
+using namespace std;
 
 struct symb
 {
@@ -87,11 +87,11 @@ void dfs(node* next);
 
 
 int lib_error = E_OK;
-int lib_compsize = 0;
+size_t lib_compsize = 0;
 
 /* initialization functions */
 
-int get_name() {
+unsigned int get_name() {
 	return DLL_NAME;
 }
 
@@ -101,7 +101,7 @@ int get_version() {
 
 /* compress functions */
 
-void* compress(void* data, int size_data) {
+void* compress(void* data, size_t size_data) {
 	/* check errors */
 	if (data == NULL) {
 		lib_error = E_BAD_INPUT;
@@ -112,7 +112,7 @@ void* compress(void* data, int size_data) {
 		return NULL;
 	}
 
-	/* compress alogorithm Huffman by Dima */
+	/* compress algorithm Huffman by Dima */
 
 	insize = size_data;
 	symb table[256]{ 0, 0 };
@@ -165,12 +165,12 @@ void* compress(void* data, int size_data) {
 		outbuf[i] = (unsigned char)res_table[i].count;
 	}
 	to_record_data();
-	lib_compsize = size_data;
+	lib_compsize = g;
 	return (void*)outbuf;
 }
 
-void* decompress(void* data, int size_data, int out_size) {
-	/*check errors */
+void* decompress(void* data, size_t size_data, size_t out_size) {
+	/* check errors */
 	if (data == NULL) {
 		lib_error = E_BAD_INPUT;
 		return NULL;
@@ -182,16 +182,22 @@ void* decompress(void* data, int size_data, int out_size) {
 	return (void*)outbuf;
 }
 
+size_t compsize() {
+  size_t retsz = lib_compsize;
+  lib_compsize = 0;
+  return retsz;
+}
+
 /* errors functions */
 
 int get_err() {
-	int err = lib_error;
+	int errlev = lib_error;
 	lib_error = E_OK;
-	return err;
+	return errlev;
 }
 
-char* err_str(int a_error) {
-	switch (a_error) {
+const char* err_str(int errlev) {
+	switch (errlev) {
 	case E_OK:
 		return "no errors";
 	case E_BAD_INPUT:
@@ -202,7 +208,13 @@ char* err_str(int a_error) {
 	return "unknown error";
 }
 
-/*  Comress  */
+/*  Additional  */
+
+void free_mem( void* ptr ) {
+  free( ptr );
+}
+
+/*  Compress  */
 
 void to_record_data()
 {
@@ -240,7 +252,7 @@ void to_record_data()
 }
 
 void create_itog_code()
-{                     
+{
 	sort_itog(n, res);
 	itog_arr[0].count = res[0].count;
 	itog_arr[0].code = res[0].code;
@@ -512,6 +524,5 @@ void sort_res(int k, res_symb* tb)
 		}
 	}
 }
-
 
 
