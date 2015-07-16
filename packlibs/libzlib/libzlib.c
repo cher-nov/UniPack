@@ -77,7 +77,11 @@ const char* err_str( int errlev ) {
   return z_zError( errlev );
 }
 
-/* additional */
+/* memory management */
+
+void* realloc_mem( void* ptr, size_t size_new ) {
+  return realloc( ptr, size_new );
+}
 
 void free_mem( void* ptr ) {
   free( ptr );

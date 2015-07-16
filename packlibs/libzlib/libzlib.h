@@ -32,6 +32,8 @@ DLL_EXPORT size_t compsize();
 
 DLL_EXPORT int get_err();
 DLL_EXPORT const char* err_str( int );
+
+DLL_EXPORT void* realloc_mem( void*, size_t );
 DLL_EXPORT void free_mem( void* );
 
 #endif // __LIBZLIB_H__
