@@ -72,7 +72,11 @@ const char* err_str( int errlev ) {
   return "unknown error";
 }
 
-/* additional */
+/* memory management */
+
+void* realloc_mem( void* ptr, size_t size_new ) {
+  return realloc( ptr, size_new );
+}
 
 void free_mem( void* ptr ) {
   free( ptr );
