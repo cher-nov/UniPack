@@ -4,6 +4,7 @@ lib/
 *.exe
 *.dll
 *.dylib
+*.upa
 
 *.res
 *.o
