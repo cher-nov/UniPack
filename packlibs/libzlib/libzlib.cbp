@@ -40,9 +40,12 @@
 				</Linker>
 			</Target>
 		</Build>
+		<Compiler>
+			<Add option="-std=c99" />
+		</Compiler>
 		<Linker>
 			<Add option="-static-libgcc" />
-			<Add library="zlib/libz.a" />
+			<Add library="zlib\libz.a" />
 			<Add directory="./" />
 		</Linker>
 		<Unit filename="libzlib.c">

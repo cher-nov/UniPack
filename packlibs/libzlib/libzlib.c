@@ -11,11 +11,11 @@
 #include "libzlib.h"
 
 int lib_error = Z_OK;
-unsigned int lib_compsize = 0;
+size_t lib_compsize = 0;
 
 /* initialization functions */
 
-int get_name() {
+unsigned int get_name() {
   return DLL_NAME;
 }
 
@@ -25,7 +25,7 @@ int get_version() {
 
 /* compress functions */
 
-void* up_pack( void* data, int size_data ) {
+void* up_pack( void* data, size_t size_data ) {
   if (lib_compsize > 0) {
     lib_error = Z_ERRNO;
     return NULL;
@@ -46,7 +46,7 @@ void* up_pack( void* data, int size_data ) {
   }
 }
 
-void* up_unpack( void* data, int size_data, int out_size ) {
+void* up_unpack( void* data, size_t size_data, size_t out_size ) {
   Bytef* outbuf = malloc( out_size );
   uLongf outlen = out_size;
   lib_error = z_uncompress( outbuf, &outlen, (Bytef*)data, size_data );
@@ -59,16 +59,22 @@ void* up_unpack( void* data, int size_data, int out_size ) {
   }
 }
 
+size_t compsize() {
+  size_t retsz = lib_compsize;
+  lib_compsize = 0;
+  return retsz;
+}
+
 /* errors functions */
 
 int get_err() {
-  int err = lib_error;
+  int errlev = lib_error;
   lib_error = Z_OK;
-  return err;
+  return errlev;
 }
 
-const char* err_str( int a_error ) {
-  return z_zError( a_error );
+const char* err_str( int errlev ) {
+  return z_zError( errlev );
 }
 
 /* additional */
