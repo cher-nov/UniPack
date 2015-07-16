@@ -10,23 +10,24 @@ uses
 
 const
   UP_NOERR = 0;
-  UP_NAMELEN = SizeOf(LongInt);
+  UP_NAMELEN = SizeOf(LongWord);
 
 { –=────────────────────────────────────────────────────────────────────────=– }
 type { Auxiliary types for TUniMethod ════════════════════════════════════════ }
 
-  TUniMethodName = String[UP_NAMELEN];
+  TUniMethodName = packed array[0..UP_NAMELEN-1] of Char;
+  TUniMethodWord = LongWord;
 
   TUniPackGetName =
-    function(): LongInt; cdecl;
+    function(): TUniMethodWord; cdecl;
   TUniPackGetVersion =
     function(): Integer; cdecl;
   TUniPackCompress =
-    function( data: Pointer; size: Integer ): Pointer; cdecl;
-  TUniPackCompSize =
-    function(): Integer; cdecl;
+    function( data: Pointer; size: SizeUInt ): Pointer; cdecl;
   TUniPackDecompress =
-    function( data: Pointer; size: Integer; outsize: Integer ): Pointer; cdecl;
+    function( data: Pointer; size: SizeUInt; outsize: SizeUInt ): Pointer; cdecl;
+  TUniPackCompSize =
+    function(): SizeUInt; cdecl;
   TUniPackGetErr =
     function(): Integer; cdecl;
   TUniPackErrStr =
@@ -73,6 +74,7 @@ var
   UPMethods: TList;
   UPLoadError : Boolean = False;
 
+function WordToName( AWord: TUniMethodWord ): TUniMethodName;
 function GetMethod( AName: TUniMethodName ): TUniMethod;
 function LoadMethodLib( ALibFile: String ): Boolean;
 procedure UnloadAllMethods();
@@ -82,6 +84,11 @@ implementation {═════════════════════�
 uses StrUtils;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
+
+function WordToName( AWord: TUniMethodWord ): TUniMethodName;
+begin
+  Result := LeftStr( PChar(@AWord), UP_NAMELEN );
+end;
 
 function GetMethod( AName: TUniMethodName ): TUniMethod;
 var
@@ -124,7 +131,6 @@ end;
 
 constructor TUniMethod.Create( ALibFile: String );
 var
-  NameInt : LongInt;
   MGetName : TUniPackGetName;
   MGetVersion : TUniPackGetVersion;
 begin
@@ -142,12 +148,11 @@ begin
     Exit;
   end;
 
-  NameInt := MGetName();
-  FName := ReverseString( LeftStr( PChar(@NameInt), UP_NAMELEN ) );
+  FName := ReverseString( WordToName( MGetName() ) );
 
   MCompress := TUniPackCompress( GetProcedureAddress( FLibrary, 'compress' ) );
-  MCompSize := TUniPackCompSize( GetProcedureAddress( FLibrary, 'compsize' ) );
   MDecompress := TUniPackDecompress( GetProcedureAddress( FLibrary, 'decompress' ) );
+  MCompSize := TUniPackCompSize( GetProcedureAddress( FLibrary, 'compsize' ) );
 
   //alternative syntax for compress() and decompress()
   if ( MCompress = nil ) then
