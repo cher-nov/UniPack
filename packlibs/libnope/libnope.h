@@ -1,10 +1,10 @@
 /*
-  NOPE.H
+  libnope.h
   (c) KoDi studio, 2015
 */
 
-#ifndef __NOPE_H__
-#define __NOPE_H__
+#ifndef __LIBNOPE_H__
+#define __LIBNOPE_H__
 
 #include <stdio.h>
 
@@ -27,14 +27,15 @@
 #define E_BAD_INPUT 1
 #define E_LOST_SIZE 2
 
-DLL_EXPORT int get_name();
+DLL_EXPORT unsigned int get_name();
 DLL_EXPORT int get_version();
 
-DLL_EXPORT void* compress( void*, int );
-DLL_EXPORT void* decompress( void*, int, int );
+DLL_EXPORT void* compress( void*, size_t );
+DLL_EXPORT void* decompress( void*, size_t, size_t );
+DLL_EXPORT size_t compsize();
 
 DLL_EXPORT int get_err();
-DLL_EXPORT char* err_str( int );
-DLL_EXPORT void free_mem( void* ptr );
+DLL_EXPORT const char* err_str( int );
+DLL_EXPORT void free_mem( void* );
 
-#endif // __NOPE_H__
+#endif // __LIBNOPE_H__

@@ -2,12 +2,12 @@
 <CodeBlocks_project_file>
 	<FileVersion major="1" minor="6" />
 	<Project>
-		<Option title="nope" />
+		<Option title="libnope" />
 		<Option pch_mode="2" />
 		<Option compiler="gcc" />
 		<Build>
 			<Target title="Debug">
-				<Option output="nope" prefix_auto="1" extension_auto="1" />
+				<Option output="libnope" prefix_auto="1" extension_auto="1" />
 				<Option object_output="cbpproj/obj/Debug/" />
 				<Option type="3" />
 				<Option compiler="gcc" />
@@ -22,7 +22,7 @@
 				</Linker>
 			</Target>
 			<Target title="Release">
-				<Option output="nope" prefix_auto="1" extension_auto="1" />
+				<Option output="libnope" prefix_auto="1" extension_auto="1" />
 				<Option object_output="cbpproj/obj/" />
 				<Option type="3" />
 				<Option compiler="gcc" />
@@ -44,10 +44,10 @@
 		<Linker>
 			<Add option="-static-libgcc" />
 		</Linker>
-		<Unit filename="nope.c">
+		<Unit filename="libnope.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="nope.h" />
+		<Unit filename="libnope.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />

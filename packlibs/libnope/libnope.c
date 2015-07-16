@@ -1,18 +1,18 @@
 /*
-  NOPE.C
+  libnope.c
   (c) KoDi studio, 2015
 */
 
 #include <stdlib.h>
 #include <memory.h>
-#include "nope.h"
+#include "libnope.h"
 
 int lib_error = E_OK;
-int lib_compsize = 0;
+size_t lib_compsize = 0;
 
 /* initialization functions */
 
-int get_name() {
+unsigned int get_name() {
   return DLL_NAME;
 }
 
@@ -22,7 +22,7 @@ int get_version() {
 
 /* compress functions */
 
-void* compress( void* data, int size_data ) {
+void* compress( void* data, size_t size_data ) {
   if (data == NULL)  {
     lib_error = E_BAD_INPUT;
     return NULL;
@@ -37,7 +37,7 @@ void* compress( void* data, int size_data ) {
   return memcpy( malloc(size_data), data, size_data );
 }
 
-void* decompress( void* data, int size_data, int out_size ) {
+void* decompress( void* data, size_t size_data, size_t out_size ) {
   if (data == NULL) {
     lib_error = E_BAD_INPUT;
     return NULL;
@@ -46,16 +46,22 @@ void* decompress( void* data, int size_data, int out_size ) {
   return memcpy( malloc(out_size), data, size_data );
 }
 
+size_t compsize() {
+  size_t retsz = lib_compsize;
+  lib_compsize = 0;
+  return retsz;
+}
+
 /* errors functions */
 
 int get_err() {
-  int err = lib_error;
+  int errlev = lib_error;
   lib_error = E_OK;
-  return err;
+  return errlev;
 }
 
-char* err_str( int a_error ) {
-  switch (a_error) {
+const char* err_str( int errlev ) {
+  switch (errlev) {
     case E_OK:
       return "no errors";
     case E_BAD_INPUT:
