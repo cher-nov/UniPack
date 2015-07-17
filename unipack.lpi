@@ -30,7 +30,7 @@
         <FormatVersion Value="1"/>
       </local>
     </RunParams>
-    <Units Count="2">
+    <Units Count="3">
       <Unit0>
         <Filename Value="unipack.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -41,6 +41,11 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="up_methods"/>
       </Unit1>
+      <Unit2>
+        <Filename Value="up_archive.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="up_archive"/>
+      </Unit2>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -58,11 +63,6 @@
         <OptimizationLevel Value="3"/>
       </Optimizations>
     </CodeGeneration>
-    <Linking>
-      <Debugging>
-        <GenerateDebugInfo Value="False"/>
-      </Debugging>
-    </Linking>
     <Other>
       <CompilerMessages>
         <MsgFileName Value=""/>
