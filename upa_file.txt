@@ -1,4 +1,4 @@
-UniPack Archive (UPA) Format Specification
+﻿UniPack Archive (UPA) Format Specification
 17.07.2015 (d.m.y)
 
 ════════════════════════════════════════════════════════════════════════════════
@@ -51,7 +51,7 @@ fileattr  unsigned char
   bit 1 - hidden
   bit 2 - system
   bit 3 - archive
-filedate  int
+filetime  int
   last file editing time in POSIX format (if -1, should not be used)
 
 3.0) PACKED DATA STREAM
