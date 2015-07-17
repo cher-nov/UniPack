@@ -1,5 +1,5 @@
 #include <stdio.h>
-#define COUNT_TESTS 5
+#define COUNT_TESTS 6
 int main() {
     for (int i = 1; i <= COUNT_TESTS; i++)  {
         char test_name[100];
