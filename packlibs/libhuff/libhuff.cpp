@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <memory.h>
-#include <malloc.h>
 #include <bitset>
 #include "libhuff.h"
 

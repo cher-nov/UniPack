@@ -11,9 +11,11 @@
 #ifndef DLL_EXPORT
   #if defined(_WIN32)
     #define DLL_EXPORT extern "C" __declspec( dllexport )
+    #include <malloc.h>
   #endif
   #if defined(__APPLE__) && defined(__MACH__)
     #define DLL_EXPORT __attribute__(( visibility( "default" )))
+    #include <malloc>
   #endif
   #ifndef DLL_EXPORT
     #error "OS not supported!"
