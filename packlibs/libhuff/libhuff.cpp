@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <memory.h>
+#include <malloc.h>
 #include <bitset>
 #include "libhuff.h"
 
@@ -47,7 +48,7 @@ unsigned long long insize, outsize;
 
 /*  Compress variables  */
 
-code_symb* res;
+code_symb* mid_res;
 res_symb* res_table;
 int curr_i;
 int temp_d[64];
@@ -134,13 +135,13 @@ void* compress(void* data, size_t size_data) {
 		if (table[i].freq != 0) n++;
 	}
 	node* tree = create_tree(table);
-	res = (code_symb*)malloc(n*sizeof(code_symb));
+	mid_res = (code_symb*)malloc(n*sizeof(code_symb));
 	curr_i = 0;
 	if (tree[0].left == NULL && tree[0].right == NULL)
 	{
-		res[0].code2 = 0;
-		res[0].code = tree[0].code;
-		res[0].count = tree[0].freq;
+		mid_res[0].code2 = 0;
+		mid_res[0].code = tree[0].code;
+		mid_res[0].count = tree[0].freq;
 	}
 	else
 	{
@@ -256,28 +257,28 @@ void to_record_data()
 
 void create_itog_code()
 {
-	sort_itog(n, res);
-	itog_arr[0].count = res[0].count;
-	itog_arr[0].code = res[0].code;
+	sort_itog(n, mid_res);
+	itog_arr[0].count = mid_res[0].count;
+	itog_arr[0].code = mid_res[0].code;
 	itog_arr[0].code2 = 0;
 	char b = 0;
 	int q = 0;
 	for (int i = 1; i < n; i++)
 	{
-		if (res[i - 1].count == res[i].count)
+		if (mid_res[i - 1].count == mid_res[i].count)
 		{
-			itog_arr[i].code = res[i].code;
+			itog_arr[i].code = mid_res[i].code;
 			itog_arr[i].code2 = itog_arr[i - 1].code2 + 1;
-			itog_arr[i].count = res[i].count;
+			itog_arr[i].count = mid_res[i].count;
 		}
 		else
 		{
-			itog_arr[i].code = res[i].code;
-			itog_arr[i].code2 = (itog_arr[i - 1].code2 + 1) << (res[i].count - res[i - 1].count);
-			itog_arr[i].count = res[i].count;
+			itog_arr[i].code = mid_res[i].code;
+			itog_arr[i].code2 = (itog_arr[i - 1].code2 + 1) << (mid_res[i].count - mid_res[i - 1].count);
+			itog_arr[i].count = mid_res[i].count;
 		}
 	}
-	delete(res);
+	delete(mid_res);
 	res_table = (res_symb*)malloc(256*sizeof(res_symb));
 	for (int i = 0; i < n; i++)
 	{
@@ -302,8 +303,8 @@ void create_code_symb(node* t, int a, int c)
 		if (t->code != -1)
 		{
 			int b = 0;
-			res[curr_i].code = t->code;
-			res[curr_i].count = c;
+			mid_res[curr_i].code = t->code;
+			mid_res[curr_i].count = c;
 			curr_i++;
 			return;
 		}
