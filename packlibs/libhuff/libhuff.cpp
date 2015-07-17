@@ -176,6 +176,7 @@ void* decompress(void* data, size_t size_data, size_t out_size) {
 		return NULL;
 	}
 	inbuf = (char*)data;
+	outbuf = (char*)malloc(out_size*sizeof(char));
 	insize = size_data;
 	outsize = out_size;
 	reading_data();
