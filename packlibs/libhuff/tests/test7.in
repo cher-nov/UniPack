@@ -1,0 +1,69 @@
+Terms used in the algorithm
+Charstream: a sequence of data to be encoded;
+Character: the basic data element in the charstream;
+Prefix: a sequence of characters that precede one character;
+String: the prefix together with the character it precedes;
+Code word: a basic data element in the codestream. It represents a string from the dictionary;
+Codestream: the sequence of code words and characters (the output of the encoding algorithm);
+Dictionary: a table of strings. Every string is assigned a code word according to its index number in the dictionary;
+Current prefix: the prefix currently being processed in the encoding algorithm. Symbol: P;
+Current character: a character determined in the endocing algorithm. Generally this is the character preceded by the current prefix. Symbol: C.
+Current code word: the code word currently processed in the decoding algorithm. It is signified by W, and the string which it denotes by string.W.
+Encoding
+At the beginning of encoding the dictionary is empty. In order to explain the principle of encoding, let's consider a point within the encoding process, when the dictionary already contains some strings.
+
+We start analyzing a new prefix in the charstream, beginning with an empty prefix. If its corresponding string (prefix + the character after it -- P+C) is present in the dictionary, the prefix is extended with the character C. This extending is repeated until we get a string which is not present in the dictionary. At that point we output two things to the codestream: the code word that represents the prefix P, and then the character C. Then we add the whole string (P+C) to the dictionary and start processing the next prefix in the charstream.
+
+A special case occurs if the dictionary doesn't contain even the starting one-character string (for example, this always happens in the first encoding step). In that case we output a special code word that represents an empty string, followed by this character and add this character to the dictionary.
+
+The output from this algorithm is a sequence of code word-character pairs (W,C). Each time a pair is output to the codestream, the string from the dictionary corresponding to W is extended with the character C and the resulting string is added to the dictionary. This means that when a new string is being added, the dictionary already contains all the substrings formed by removing characters from the end of the new string.
+
+The encoding algorithm
+At the start, the dictionary and P are empty;
+C := next character in the charstream;
+Is the string P+C present in the dictionary?
+if it is, P := P+C (extend P with C);
+if not,
+output these two objects to the codestream:
+the code word corresponding to P (if P is empty, output a zero);
+C, in the same form as input from the charstream;
+add the string P+C to the dictionary;
+P := empty;
+are there more characters in the charstream?
+if yes, return to step 2;
+if not:
+if P is not empty, output the code word corresponding to P;
+END.
+Decoding
+At the start of decoding the dictionary is empty. It gets reconstructed in the process of decoding. In each step a pair code word-character -- (W,C) is read from the codestream. The code word always refers to a string already present in the dictionary. The string.W and C are output to the charstream and the string (string.W+C) is added to the dictionary. After the decoding, the dictionary will look exactly the same as after the encoding.
+
+The decoding algorithm
+At the start the dictionary is empty;
+W := next code word in the codestream;
+C := the character following it;
+output the string.W to the codestream (this can be an empty string), and then output C;
+add the string.W+C to the dictionary;
+are there more code words in the codestream?
+if yes, go back to step 2;
+if not, END.
+An example
+The encoding process is presented in Table 1.
+
+The column Step indicates the number of the encoding step. Each encoding step is completed when the step 3.b. in the encoding algorithm is executed.
+The column Pos indicates the current position in the input data.
+The column Dictionary shows what string has been added to the dictionary. The index of the string is equal to the step number.
+The column Output presents the output in the form (W,C).
+The output of each step decodes to the string that has been added to the dictionary.
+Charstream to be encoded:
+Pos	1	2	3	4	5	6	7	8	9
+Char	A	B	B	C	B	C	A	B	A
+Table 1: The encoding process
+Step	Pos	Dictionary	Output
+1.	1	A	(0,A)
+2.	2	B	(0,B)
+3.	3	B C	(2,C)
+4.	5	B C A	(3,A)
+5.	8	B A	(2,A)
+Practical characteristics
+The biggest advantage over the LZ77 algorithm is the reduced number of string comparisons in each encoding step. The compression ratio is similar to the LZ77. Since the derived method, LZW, is much more popular, you should see there for further info.
+

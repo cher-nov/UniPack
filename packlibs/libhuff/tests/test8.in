@@ -1,0 +1,167 @@
+#include <iostream>
+
+#include <cmath>
+
+#include <vector>
+
+
+
+using namespace std;
+
+
+
+typedef struct _edge  {
+
+    int a;
+
+    int b;
+
+    int cost;
+
+} edge;
+
+
+
+vector <edge> list;
+
+vector <int> id;
+
+int sum = 0;
+
+
+
+bool check_id(int n)  {
+
+    for (int i = 1; i < n; i++)  {
+
+        if (id[i] != id[0])  {
+
+            return 0;
+
+        }
+
+    }
+
+return 1;
+
+}
+
+
+
+void q_sort(int l, int r, vector<edge> a)  {
+
+    int x = a[l + (r - l) / 2].cost;
+
+    int i = l;
+
+    int j = r;
+
+    while (i <= j)  {
+
+        while (list[i].cost < x) i++;
+
+        while (list[j].cost > x) j--;
+
+        if (i <= j)  {
+
+            if (list[i].cost > list[j].cost)  {
+
+                swap(list[i], list[j]);
+
+            }
+
+        i++; j--;
+
+        }
+
+    }
+
+    if (i < r)  {
+
+        q_sort(i, r, a);
+
+    }
+
+    if (l < j)  {
+
+        q_sort(l, j, a);
+
+    }
+
+}
+
+
+
+int main()  {
+
+    freopen("input.txt", "rt", stdin);
+
+    freopen("output.txt", "wt", stdout);
+
+    int n = 0; int m = 0;
+
+    cin >> n >> m;
+
+
+
+    for (int i = 0; i < m; i++)  {
+
+        edge c;
+
+        cin >> c.a >> c.b >> c.cost;
+
+        list.push_back(c);
+
+    }
+
+    for (int i = 0; i < n; i++)  {
+
+        id.push_back(i);
+
+    }
+
+
+
+    q_sort(0, m - 1, list);
+
+
+
+    for (int i = 0; i < m; i++)  {
+
+        if (id[list[i].a - 1] != id[list[i].b - 1])  {
+
+            sum += list[i].cost;
+
+            int old_id = id[list[i].b - 1];
+
+            int new_id = id[list[i].a - 1];
+
+            for (int j = 0; j < n; j++)  {
+
+                if (id[j] == old_id)  {
+
+                    id[j] = new_id;
+
+                }
+
+            }
+
+        }
+
+    }
+
+    if (sum != 0 && check_id(n))  {
+
+        cout << sum;
+
+    }
+
+    else  {
+
+        cout << "-1";
+
+    }
+
+    return 0;
+
+}
