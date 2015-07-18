@@ -517,6 +517,7 @@ procedure TUniPackArchive.SetMethod( AMethod: TUniMethod );
 var
   i : Integer;
 begin
+  if ( AMethod = FMethod ) then Exit;
   for i := 0 to FFiles.Count-1 do UnpackData(i);
   FMethod := AMethod;
 end;
