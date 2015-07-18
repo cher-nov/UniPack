@@ -10,6 +10,7 @@ uses
   Classes, SysUtils, up_methods;
 
 const
+  UPA_FILEEXT = '.upa';
   UPA_SIGN = 'UPA';
   UPA_MAXFILES = 65535;
 
@@ -35,6 +36,9 @@ type { UPA Archives management class ══════════════�
         DataOffset : SizeUInt );
   end;
 
+  TErrorUPA = ( UPA_OK, UPA_NOFILE, UPA_BADSIGN, UPA_NOMETHOD,
+    UPA_NOMEMORY, UPA_LIBERROR );
+
   TUniPackArchive = class
   strict private
     FFileName : String;
@@ -45,11 +49,12 @@ type { UPA Archives management class ══════════════�
     function AddEntry( AName: String = ''; ASize: SizeUInt = 0;
       AAttr: Byte = 0; ATime: LongInt = -1 ): Integer;
     procedure SetEntryData( Index: Integer; APacked: Boolean; ASize: SizeUInt;
-      ALibMem: Boolean; AMemory: Pointer ); overload; // DS_APPPMEM / DS_LIBMEM
+      ALibMem: Boolean; AMemory: Pointer ); overload; // DS_APPMEM / DS_LIBMEM
     procedure SetEntryData( Index: Integer; APacked: Boolean; ASize: SizeUInt;
       AHandle: THandle; AOffset: SizeUInt ); overload; // DS_FILE
     function GetEntry( Index: Integer ): TFileEntry;
     function GetCount: Integer;
+    function GetMethodName: TUniMethodName;
     procedure CloseHandle( Index: Integer );
     procedure FreeBuffer( Index: Integer );
     procedure FileToMemory( Index: Integer; AClose: Boolean = True );
@@ -67,6 +72,7 @@ type { UPA Archives management class ══════════════�
     property Files[Index: Integer]: TFileEntry read GetEntry;
     property Count: Integer read GetCount;
     property Solid: Boolean read FSolid write FSolid;
+    property Method: TUniMethodName read GetMethodName;
   end;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
@@ -77,8 +83,7 @@ function StrTimePOSIX( TimePOSIX: LongInt ): String;
 function GetFileSize( FileHandle: THandle ): Int64;
 
 var
-  UPALastError : ( UPA_OK, UPA_NOFILE, UPA_BADSIGN, UPA_NOMETHOD,
-    UPA_NOMEMORY, UPA_LIBERROR ) = UPA_OK;
+  UPALastError : TErrorUPA = UPA_OK;
 
 implementation {═══════════════════════════════════════════════════════════════}
 
@@ -336,6 +341,10 @@ var
   Entry : TEntryFAT;
   StreamOffset : QWord;
 begin
+  //TODO: Write saving of solid archives
+  if FSolid then
+    raise Exception.Create('Solid archives not supported yet, sorry.');
+  
   UPAFile := FFileName;
   if ( FHandle <> UnusedHandle ) then UPAFile := ChangeFileExt( UPAFile, '.tmp' );
   UPAFile := UniqueFileName( ExpandFileName( UPAFile ) );
@@ -367,7 +376,7 @@ begin
     FileWrite( outFile, Entry, SizeOf(TEntryFAT) );
   end;
 
-  FSolid := False; //TODO: Write saving of solid archives
+  //TODO: Write saving of packed data ON writing corresponding FAT entry
 
   //if archive isn't solid, just writing packed files data
   StreamOffset := FileSeek( outFile, 0, fsFromCurrent );
@@ -376,8 +385,7 @@ begin
       MemoryToFile( i, outFile, StreamOffset );
       StreamOffset += PFileEntry( FFiles[i] )^.DataSize;
     end;
-  end else
-    raise Exception.Create( 'Solid archives saving isn`t supported now.' );
+  end; // else
 
   FileClose( outFile );
   if ( FHandle <> UnusedHandle ) then begin
@@ -433,7 +441,7 @@ begin
     end else
       FileBuf := MemoryPtr;
 
-    ADir += FileName;
+    ADir := IncludeTrailingPathDelimiter(ADir) + FileName;
     hfile := FileCreate( ADir, fmShareExclusive );
     FileWrite( hfile, FileBuf^, FileSize );
     SetFileTimePOSIX( hfile, FileTime );
@@ -588,12 +596,15 @@ end;
 procedure TUniPackArchive.FileToMemory( Index: Integer; AClose: Boolean = True );
 var
   tempbuf : Pointer;
+  oldoffs : Int64;
 begin
   with PFileEntry( FFiles[Index] )^ do begin
     if ( Storage <> DS_FILE ) then Exit;
     tempbuf := GetMemory( DataSize );
+    oldoffs := FileSeek( FileHandle, 0, fsFromCurrent );
     FileSeek( FileHandle, DataOffset, fsFromBeginning );
     FileRead( FileHandle, tempbuf^, DataSize );
+    FileSeek( FileHandle, oldoffs, fsFromBeginning );
   end;
   if AClose then CloseHandle(Index);
   with PFileEntry( FFiles[Index] )^ do begin
@@ -604,11 +615,15 @@ end;
 
 procedure TUniPackArchive.MemoryToFile( Index: Integer; Handle: THandle;
   Offset: SizeUInt );
+var
+  oldoffs : Int64;
 begin
   with PFileEntry( FFiles[Index] )^ do begin
     if not ( Storage in [DS_APPMEM, DS_LIBMEM] ) then Exit;
+    oldoffs := FileSeek( Handle, 0, fsFromCurrent );
     FileSeek( Handle, Offset, fsFromBeginning );
     FileWrite( Handle, MemoryPtr^, DataSize );
+    FileSeek( Handle, oldoffs, fsFromBeginning );
   end;
   FreeBuffer(Index);
   with PFileEntry( FFiles[Index] )^ do begin
@@ -629,6 +644,10 @@ end;
 
 function TUniPackArchive.GetCount: Integer;
    begin Result := FFiles.Count;
+     end;
+
+function TUniPackArchive.GetMethodName: TUniMethodName;
+   begin Result := FMethod.Name;
      end;
 
 end.
