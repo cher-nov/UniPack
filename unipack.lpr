@@ -15,7 +15,7 @@ type { ═ TMainApp ────────────────────
 
   TMainApp = class( TCustomApplication )
   const
-    APPVER = '0.1';
+    APPVER = '0.2';
   strict private
     FWorkMode : ( MODE_UNKNOWN, MODE_PACK, MODE_UNPACK, MODE_REPACK );
     //FErrorNum : Integer;
@@ -222,7 +222,7 @@ begin
     Exit();
   end;
 
-  WriteLn( 'Method: ', ArchUPA.Method );
+  WriteLn( 'Archive method: ', ArchUPA.Method );
   ArchUPA.SetMethod( AMethod );
   WriteLn( 'repacking, please wait...' );
   ArchUPA.DestroySave();
@@ -243,7 +243,7 @@ begin
     Exit();
   end;
 
-  WriteLn( 'Method: ', ArchUPA.Method );
+  WriteLn( 'Archive method: ', ArchUPA.Method );
 
   for i := 0 to ArchUPA.Count-1 do begin
     FileEntry := ArchUPA.Files[i];
