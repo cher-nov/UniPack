@@ -357,17 +357,25 @@ begin
   Header.FileNum := FFiles.Count;
   FileWrite( outFile, Header, SizeOf(THeaderUPA) );
 
-  //packing files and writing FAT
+  //calculating data stream offset in archive file
+  StreamOffset := SizeOf(THeaderUPA) + FFiles.Count * SizeOf(TEntryFAT);
+  for i := 0 to FFiles.Count-1 do // +1 is for string length descriptor
+    StreamOffset += Length( PFileEntry( FFiles[i] )^.FileName ) + 1;
+  
+  //packing files and writing its data and FAT entries
   for i := 0 to FFiles.Count-1 do begin
     with PFileEntry( FFiles[i] )^ do begin
       FileToMemory(i); //because file could be stored packed in archive
       if not FSolid then begin
+        //if archive isn't solid, just writing packed files data
         PackData(i);
+        MemoryToFile( i, outFile, StreamOffset );
+        StreamOffset += DataSize;
         Entry.PackSize := DataSize;
-      end else begin
+      end {else begin
         UnpackData(i);
         Entry.PackSize := 0;
-      end;
+      end};
       Entry.FileSize := FileSize;
       Entry.FileAttr := FileAttr;
       Entry.FileTime := FileTime;
@@ -375,17 +383,6 @@ begin
     end;
     FileWrite( outFile, Entry, SizeOf(TEntryFAT) );
   end;
-
-  //TODO: Write saving of packed data ON writing corresponding FAT entry
-
-  //if archive isn't solid, just writing packed files data
-  StreamOffset := FileSeek( outFile, 0, fsFromCurrent );
-  if not FSolid then begin
-    for i := 0 to FFiles.Count-1 do begin
-      MemoryToFile( i, outFile, StreamOffset );
-      StreamOffset += PFileEntry( FFiles[i] )^.DataSize;
-    end;
-  end; // else
 
   FileClose( outFile );
   if ( FHandle <> UnusedHandle ) then begin
