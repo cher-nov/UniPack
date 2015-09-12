@@ -12,7 +12,11 @@ lib/
 *.a
 
 *.bak
+*.~*
+~*
 Thumbs.db
+Desktop.ini
+Копия*
 
 *.lps
 *.def
@@ -22,3 +26,4 @@ Thumbs.db
 # Exceptions
 !libz.a
 temporary.pas
+roadmap.txt
