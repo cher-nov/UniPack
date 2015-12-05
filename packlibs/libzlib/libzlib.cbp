@@ -52,8 +52,6 @@
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="libzlib.h" />
-		<Unit filename="zlib/zconf.h" />
-		<Unit filename="zlib/zlib.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />
