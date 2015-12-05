@@ -33,9 +33,9 @@ typedef unsigned long long int up_datasize_t;
 extern "C" {
 #endif
 
-DLL_EXPORT char* up_info_name();
+DLL_EXPORT const char* up_info_name();
 DLL_EXPORT int up_info_version();
-DLL_EXPORT char* up_last_error();
+DLL_EXPORT const char* up_last_error();
 
 DLL_EXPORT void up_pack_init( up_datasize_t );
 DLL_EXPORT size_t up_pack_chunk( void*, size_t, void*, size_t );

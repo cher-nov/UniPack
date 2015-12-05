@@ -6,13 +6,13 @@
 #include <memory.h>
 #include "libnope.h"
 
-int lib_error = UP_OK;
-up_datasize_t lib_pack_size = 0;
-up_datasize_t lib_unpack_size = 0;
+static int lib_error = UP_OK;
+static up_datasize_t lib_pack_size = 0;
+static up_datasize_t lib_unpack_size = 0;
 
 /* plugin info functions */
 
-char* up_info_name() {
+const char* up_info_name() {
   return DLL_NAME;
 }
 
@@ -20,7 +20,7 @@ int up_info_version() {
   return DLL_VERSION;
 }
 
-char* up_last_error() {
+const char* up_last_error() {
   int err = lib_error;
   lib_error = UP_OK;
 
