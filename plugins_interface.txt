@@ -30,7 +30,8 @@ char* up_last_error()
 
 // Инициализирует сжатие.
 void up_pack_init(
-  size_t pack_size  // полный размер данных, которые будут сжаты
+  unsigned long long int pack_size
+    // полный размер данных, которые будут сжаты
 )
 
 /*
@@ -56,7 +57,8 @@ void up_pack_end()
 
 // Инициализирует распаковку.
 void up_unpack_init(
-  size_t data_size  // полный размер данных, которые будут распакованы
+  unsigned long long int data_size
+    // полный размер данных, которые будут распакованы
 )
 
 /*
