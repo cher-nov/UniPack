@@ -38,11 +38,13 @@ DLL_EXPORT int up_info_version();
 DLL_EXPORT const char* up_last_error();
 
 DLL_EXPORT void up_pack_init( up_datasize_t );
-DLL_EXPORT size_t up_pack_chunk( void*, size_t, void*, size_t );
+DLL_EXPORT void up_pack_chunk( void*, size_t );
+DLL_EXPORT size_t up_pack_step( void*, size_t );
 DLL_EXPORT void up_pack_end();
 
 DLL_EXPORT void up_unpack_init( up_datasize_t );
-DLL_EXPORT size_t up_unpack_chunk( void*, size_t, void*, size_t );
+DLL_EXPORT void up_unpack_chunk( void*, size_t );
+DLL_EXPORT size_t up_unpack_step( void*, size_t );
 DLL_EXPORT void up_unpack_end();
 
 #ifdef __cplusplus

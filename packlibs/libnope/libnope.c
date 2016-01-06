@@ -7,8 +7,10 @@
 #include "libnope.h"
 
 static int lib_error = UP_OK;
-static up_datasize_t lib_pack_size = 0;
-static up_datasize_t lib_unpack_size = 0;
+static void* lib_pack_chunk;
+static up_datasize_t lib_pack_size;
+static void* lib_unpack_chunk;
+static up_datasize_t lib_unpack_size;
 
 /* plugin info functions */
 
@@ -45,13 +47,16 @@ const char* up_last_error() {
 /* compression functions */
 
 void up_pack_init( up_datasize_t pack_size ) {
-  lib_pack_size = pack_size;
+  up_pack_chunk(NULL, 0);
 }
 
-size_t up_pack_chunk(
-  void* chunk_ptr, size_t chunk_size, void* outbuf_ptr, size_t outbuf_size
-) {
-  if ( (chunk_ptr == NULL) || (lib_pack_size < chunk_size) ) {
+void up_pack_chunk( void* chunk_ptr, size_t chunk_size ) {
+  lib_pack_chunk = chunk_ptr;
+  lib_pack_size = chunk_size;
+}
+
+size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size ) {
+  if ( (lib_pack_chunk == NULL) || (lib_pack_size < 1) ) {
     lib_error = UP_DATA_ERROR;
     return 0;
   }
@@ -61,26 +66,28 @@ size_t up_pack_chunk(
     return 0;
   }
 
-  size_t copy_size = (outbuf_size < chunk_size) ? outbuf_size : chunk_size;
-  lib_pack_size -= copy_size;
-  memcpy( outbuf_ptr, chunk_ptr, copy_size );
+  size_t copy_size = (outbuf_size < lib_pack_size) ? outbuf_size : lib_pack_size;
+  memcpy( outbuf_ptr, lib_pack_chunk, copy_size );
   return copy_size;
 }
 
 void up_pack_end() {
-  lib_pack_size = 0;
+  up_pack_init(0);
 }
 
 /* decompression functions */
 
 void up_unpack_init( up_datasize_t unpack_size ) {
-  lib_unpack_size = unpack_size;
+  up_unpack_chunk(NULL, 0);
 }
 
-size_t up_unpack_chunk(
-  void* chunk_ptr, size_t chunk_size, void* outbuf_ptr, size_t outbuf_size
-) {
-  if ( (chunk_ptr == NULL) || (lib_unpack_size < chunk_size) ) {
+void up_unpack_chunk( void* chunk_ptr, size_t chunk_size ) {
+  lib_unpack_chunk = chunk_ptr;
+  lib_unpack_size = chunk_size;
+}
+
+size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size ) {
+  if ( (lib_unpack_chunk == NULL) || (lib_unpack_size < 1) ) {
     lib_error = UP_DATA_ERROR;
     return 0;
   }
@@ -90,14 +97,13 @@ size_t up_unpack_chunk(
     return 0;
   }
 
-  size_t copy_size = (outbuf_size < chunk_size) ? outbuf_size : chunk_size;
-  lib_unpack_size -= copy_size;
-  memcpy( outbuf_ptr, chunk_ptr, copy_size );
+  size_t copy_size = (outbuf_size < lib_unpack_size) ? outbuf_size : lib_unpack_size;
+  memcpy( outbuf_ptr, lib_unpack_chunk, copy_size );
   return copy_size;
 }
 
 void up_unpack_end() {
-  lib_unpack_size = 0;
+  up_unpack_init(0);
 }
 
 
