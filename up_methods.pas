@@ -24,7 +24,8 @@ type { Auxiliary types for TUniPackMethod ════════════�
   upfunc_PackChunk =
     procedure( chunk: Pointer; chunk_sz: SizeUInt ); cdecl;
   upfunc_PackStep =
-    function( outbuf: Pointer; outbuf_sz: SizeUInt ): SizeUInt; cdecl;
+    function( outbuf: Pointer; outbuf_sz: SizeUInt;
+      var data_left: SizeUInt ): SizeUInt; cdecl;
   upfunc_EndPack =
     procedure(); cdecl;
   upfunc_InitUnpack =
@@ -32,7 +33,8 @@ type { Auxiliary types for TUniPackMethod ════════════�
   upfunc_UnpackChunk =
     procedure( chunk: Pointer; chunk_sz: SizeUInt ); cdecl;
   upfunc_UnpackStep =
-    function( outbuf: Pointer; outbuf_sz: SizeUInt ): SizeUInt; cdecl;
+    function( outbuf: Pointer; outbuf_sz: SizeUInt;
+      var data_left: SizeUInt ): SizeUInt; cdecl;
   upfunc_EndUnpack =
     procedure(); cdecl;
 

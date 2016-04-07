@@ -54,7 +54,7 @@ void up_pack_chunk( void* chunk_ptr, size_t chunk_size ) {
   lib_zstream_pack.avail_in = chunk_size;
 }
 
-size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size ) {
+size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
   lib_zstream_pack.next_out = outbuf_ptr;
   lib_zstream_pack.avail_out = outbuf_size;
 
@@ -67,6 +67,7 @@ size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size ) {
     case Z_OK:
     case Z_STREAM_END:
       lib_pack_size -= input_size - lib_zstream_pack.avail_in;
+      if (data_left != NULL) { *data_left = lib_zstream_pack.avail_in; }
       return outbuf_size - lib_zstream_pack.avail_out;
     break;
 
@@ -97,7 +98,7 @@ void up_unpack_chunk( void* chunk_ptr, size_t chunk_size ) {
   lib_zstream_unpack.avail_in = chunk_size;
 }
 
-size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size ) {
+size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
   lib_zstream_unpack.next_out = outbuf_ptr;
   lib_zstream_unpack.avail_out = outbuf_size;
 
@@ -107,6 +108,7 @@ size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size ) {
   switch (result) {
     case Z_OK:
     case Z_STREAM_END:
+      if (data_left != NULL) { *data_left = lib_zstream_unpack.avail_in; }
       return outbuf_size - lib_zstream_unpack.avail_out;
     break;
 

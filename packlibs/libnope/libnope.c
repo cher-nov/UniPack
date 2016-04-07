@@ -55,8 +55,8 @@ void up_pack_chunk( void* chunk_ptr, size_t chunk_size ) {
   lib_pack_size = chunk_size;
 }
 
-size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size ) {
-  if ( (lib_pack_chunk == NULL) || (lib_pack_size < 1) ) {
+size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
+  if (lib_pack_chunk == NULL) {
     lib_error = UP_DATA_ERROR;
     return 0;
   }
@@ -68,6 +68,10 @@ size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size ) {
 
   size_t copy_size = (outbuf_size < lib_pack_size) ? outbuf_size : lib_pack_size;
   memcpy( outbuf_ptr, lib_pack_chunk, copy_size );
+  lib_pack_chunk += copy_size;
+  lib_pack_size -= copy_size;
+  if (data_left != NULL) { *data_left = lib_pack_size; }
+
   return copy_size;
 }
 
@@ -86,8 +90,8 @@ void up_unpack_chunk( void* chunk_ptr, size_t chunk_size ) {
   lib_unpack_size = chunk_size;
 }
 
-size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size ) {
-  if ( (lib_unpack_chunk == NULL) || (lib_unpack_size < 1) ) {
+size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
+  if (lib_unpack_chunk == NULL) {
     lib_error = UP_DATA_ERROR;
     return 0;
   }
@@ -99,6 +103,10 @@ size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size ) {
 
   size_t copy_size = (outbuf_size < lib_unpack_size) ? outbuf_size : lib_unpack_size;
   memcpy( outbuf_ptr, lib_unpack_chunk, copy_size );
+  lib_unpack_chunk += copy_size;
+  lib_unpack_size -= copy_size;
+  if (data_left != NULL) { *data_left = lib_unpack_size; }
+
   return copy_size;
 }
 
