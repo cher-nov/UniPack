@@ -56,12 +56,12 @@ void up_pack_chunk( void* chunk_ptr, size_t chunk_size ) {
 }
 
 size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
-  if (lib_pack_chunk == NULL) {
+  if ( (lib_pack_chunk == NULL) || (lib_pack_size == 0) ) {
     lib_error = UP_DATA_ERROR;
     return 0;
   }
 
-  if ( (outbuf_ptr == NULL) || (outbuf_size < 1) ) {
+  if ( (outbuf_ptr == NULL) || (outbuf_size == 0) ) {
     lib_error = UP_MEMORY_ERROR;
     return 0;
   }
@@ -91,12 +91,12 @@ void up_unpack_chunk( void* chunk_ptr, size_t chunk_size ) {
 }
 
 size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
-  if (lib_unpack_chunk == NULL) {
+  if ( (lib_unpack_chunk == NULL) || (lib_unpack_size == 0) ) {
     lib_error = UP_DATA_ERROR;
     return 0;
   }
 
-  if ( (outbuf_ptr == NULL) || (outbuf_size < 1) ) {
+  if ( (outbuf_ptr == NULL) || (outbuf_size == 0) ) {
     lib_error = UP_MEMORY_ERROR;
     return 0;
   }
