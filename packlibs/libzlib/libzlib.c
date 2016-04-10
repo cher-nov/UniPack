@@ -17,7 +17,7 @@
 #endif
 
 static int lib_error = Z_OK;
-static up_datasize_t lib_pack_size = 0;
+static up_datasize_t lib_pack_left = 0;
 static z_stream lib_zstream_pack;
 static z_stream lib_zstream_unpack;
 
@@ -42,7 +42,7 @@ const char* up_last_error() {
 /* compression functions */
 
 void up_pack_init( up_datasize_t pack_size ) {
-  lib_pack_size = pack_size;
+  lib_pack_left = pack_size;
   lib_zstream_pack.zalloc = Z_NULL;
   lib_zstream_pack.zfree = Z_NULL;
   lib_zstream_pack.opaque = Z_NULL;
@@ -58,15 +58,15 @@ size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
   lib_zstream_pack.next_out = outbuf_ptr;
   lib_zstream_pack.avail_out = outbuf_size;
 
-  int result, flush, input_size;
-  input_size = lib_zstream_pack.avail_in;
-  flush = (lib_pack_size > input_size) ? Z_NO_FLUSH : Z_FINISH;
+  int result, flush;
+  size_t input_size = lib_zstream_pack.avail_in;
+  flush = (lib_pack_left > input_size) ? Z_NO_FLUSH : Z_FINISH;
   result = z_deflate( &lib_zstream_pack, flush );
 
   switch (result) {
     case Z_OK:
     case Z_STREAM_END:
-      lib_pack_size -= input_size - lib_zstream_pack.avail_in;
+      lib_pack_left -= input_size - lib_zstream_pack.avail_in;
       if (data_left != NULL) { *data_left = lib_zstream_pack.avail_in; }
       return outbuf_size - lib_zstream_pack.avail_out;
     break;
@@ -79,7 +79,7 @@ size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
 
 void up_pack_end() {
   z_deflateEnd( &lib_zstream_pack );
-  lib_pack_size = 0;
+  lib_pack_left = 0;
 }
 
 /* decompression functions */
