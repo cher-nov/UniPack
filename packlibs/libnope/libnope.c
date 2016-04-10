@@ -8,9 +8,9 @@
 
 static int lib_error = UP_OK;
 static void* lib_pack_chunk;
-static up_datasize_t lib_pack_size;
+static size_t lib_pack_size;
 static void* lib_unpack_chunk;
-static up_datasize_t lib_unpack_size;
+static size_t lib_unpack_size;
 
 /* plugin info functions */
 
