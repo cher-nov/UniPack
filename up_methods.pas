@@ -11,6 +11,7 @@ uses
 { –=────────────────────────────────────────────────────────────────────────=– }
 type { Auxiliary types for TUniPackMethod ════════════════════════════════════ }
 
+  PSizeUInt = ^SizeUInt;
   uplib_MethodName = packed array[0..3] of Char;
 
   upfunc_GetName =
@@ -27,7 +28,7 @@ type { Auxiliary types for TUniPackMethod ════════════�
     procedure( chunk: Pointer; chunk_sz: SizeUInt ); cdecl;
   upfunc_PackStep =
     function( outbuf: Pointer; outbuf_sz: SizeUInt;
-      var data_left: SizeUInt ): SizeUInt; cdecl;
+      data_left: PSizeUInt = nil ): SizeUInt; cdecl;
   upfunc_EndPack =
     procedure(); cdecl;
   upfunc_InitUnpack =
@@ -36,7 +37,7 @@ type { Auxiliary types for TUniPackMethod ════════════�
     procedure( chunk: Pointer; chunk_sz: SizeUInt ); cdecl;
   upfunc_UnpackStep =
     function( outbuf: Pointer; outbuf_sz: SizeUInt;
-      var data_left: SizeUInt ): SizeUInt; cdecl;
+      data_left: PSizeUInt = nil ): SizeUInt; cdecl;
   upfunc_EndUnpack =
     procedure(); cdecl;
 

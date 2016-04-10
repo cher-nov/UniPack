@@ -451,7 +451,7 @@ begin
       BytesOut += ChunkDataLeft;
     end;
 
-    PackedSize := aMethod.PackStep( PackedBuf, FPackBufSize, ChunkDataLeft );
+    PackedSize := aMethod.PackStep( PackedBuf, FPackBufSize, @ChunkDataLeft );
     if aMethod.HasError() then begin
       FileClose( ArchFile );
       SysUtils.DeleteFile( NewFileName );
@@ -843,11 +843,11 @@ begin
 
       //performing decompression step
       if (FDplSkippedBefore = entry^.SkipBytesBefore) or not FSolid then begin
-        Result := FMethod.UnpackStep( out_buf, out_size, FDplChunkDataLeft );
+        Result := FMethod.UnpackStep( out_buf, out_size, @FDplChunkDataLeft );
       end else begin //if less
         skip_size := entry^.SkipBytesBefore - FDplSkippedBefore;
         if skip_size > FOutputBufSize then out_size := FOutputBufSize;
-        skip_size := FMethod.UnpackStep( void_buf, skip_size, FDplChunkDataLeft );
+        skip_size := FMethod.UnpackStep( void_buf, skip_size, @FDplChunkDataLeft );
         FDplSkippedBefore += skip_size;
       end;
     until FDplSkippedBefore = entry^.SkipBytesBefore;
