@@ -29,14 +29,25 @@ int up_info_version() {
   return DLL_VERSION;
 }
 
-const char* up_last_error() {
-  if (lib_error == Z_OK) {
+bool up_has_error( int* ret_code ) {
+  int err = lib_error;
+  if (ret_code != NULL) {
+    *ret_code = err;
+    lib_error = Z_OK;
+  }
+  return (err != Z_OK);
+}
+
+const char* up_error_msg( int err_code ) {
+  if (err_code == Z_OK) {
     return NULL;
   } else {
-    int err = lib_error;
-    lib_error = Z_OK;
-    return z_zError(err);
+    return z_zError(err_code);
   }
+}
+
+const char* up_last_error() {
+
 }
 
 /* compression functions */

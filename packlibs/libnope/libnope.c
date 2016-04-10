@@ -22,11 +22,17 @@ int up_info_version() {
   return DLL_VERSION;
 }
 
-const char* up_last_error() {
+bool up_has_error( int* ret_code ) {
   int err = lib_error;
-  lib_error = UP_OK;
+  if (ret_code != NULL) {
+    *ret_code = err;
+    lib_error = UP_OK;
+  }
+  return (err != UP_OK);
+}
 
-  switch (err) {
+const char* up_error_msg( int err_code ) {
+  switch (err_code) {
     case UP_OK:
       return NULL;
     break;
@@ -40,7 +46,6 @@ const char* up_last_error() {
       return "plugin memory error";
     break;
   }
-
   return "unknown error";
 }
 

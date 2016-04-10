@@ -6,6 +6,8 @@
 #ifndef __LIBZLIB_H__
 #define __LIBZLIB_H__
 
+#include <stdbool.h>
+
 #ifndef DLL_EXPORT
   #if defined(_WIN32)
     #define DLL_EXPORT __cdecl __declspec( dllexport )
@@ -29,7 +31,8 @@ extern "C" {
 
 DLL_EXPORT const char* up_info_name();
 DLL_EXPORT int up_info_version();
-DLL_EXPORT const char* up_last_error();
+DLL_EXPORT bool up_has_error( int* );
+DLL_EXPORT const char* up_error_msg( int );
 
 DLL_EXPORT void up_pack_init( up_datasize_t );
 DLL_EXPORT void up_pack_chunk( void*, size_t );

@@ -441,7 +441,6 @@ begin
 
       //read data to be packed, from pipeline
       repeat
-        //TODO: handle pipeline error here
         ChunkDataLeft += PipelineGetData( ChunkDataLeft );
       until (
         not aSolid //if non-solid, read file data only once
@@ -453,7 +452,7 @@ begin
     end;
 
     PackedSize := aMethod.PackStep( PackedBuf, FPackBufSize, ChunkDataLeft );
-    if PackedSize = 0 then begin
+    if aMethod.HasError() then begin
       FileClose( ArchFile );
       SysUtils.DeleteFile( NewFileName );
       PipelineFree();
@@ -609,11 +608,6 @@ begin
     BytesWrite := 0;
     while BytesWrite < entry^.Info.Size do begin
       BytesRead := PipelineGetData(0);
-      if BytesRead = 0 then begin
-        FileClose( hfile );
-        PipelineFree();
-        Exit( eupFileError );
-      end;
       FileWrite( hfile, FDplDataOutBuf^, BytesRead );
       BytesWrite += BytesRead;
     end;
@@ -805,7 +799,6 @@ begin
   Result := True;
 end;
 
-//returns 0 on error, count of read bytes otherwise
 function TUniPackArchive.PipelineGetData( OutBufOffset: SizeUInt ): SizeUInt;
 var
   entry : PFileEntryUPA;

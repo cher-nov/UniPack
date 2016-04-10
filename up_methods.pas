@@ -17,8 +17,10 @@ type { Auxiliary types for TUniPackMethod ════════════�
     function(): PChar; cdecl;
   upfunc_GetVersion =
     function(): Integer; cdecl;
-  upfunc_LastError =
-    function(): PChar; cdecl;
+  upfunc_HasError =
+    function( ret_code: PInteger = nil ): Boolean; cdecl;
+  upfunc_ErrorMsg =
+    function( err_code: Integer ): PChar; cdecl;
   upfunc_InitPack =
     procedure( pack_sz: QWord ); cdecl;
   upfunc_PackSetChunk =
@@ -47,7 +49,8 @@ type { TUniPackMethod - UniPack method library ═══════════
   TUniPackMethod = class
   strict private
     //methods
-    MLastError : upfunc_LastError;
+    MHasError : upfunc_HasError;
+    MErrorMsg : upfunc_ErrorMsg;
     MInitPack : upfunc_InitPack;
     MPackSetChunk : upfunc_PackSetChunk;
     MPackStep : upfunc_PackStep;
@@ -73,7 +76,8 @@ type { TUniPackMethod - UniPack method library ═══════════
     class function Get( AName: uplib_MethodName ): TUniPackMethod; overload;
     class function Get( AIndex: Integer ): TUniPackMethod; overload;
 
-    property LastError: upfunc_LastError read MLastError;
+    property HasError: upfunc_HasError read MHasError;
+    property ErrorMsg: upfunc_ErrorMsg read MErrorMsg;
     property InitPack: upfunc_InitPack read MInitPack;
     property PackSetChunk: upfunc_PackSetChunk read MPackSetChunk;
     property PackStep: upfunc_PackStep read MPackStep;
@@ -174,10 +178,12 @@ begin
 
   MGetName := upfunc_GetName(
     GetProcedureAddress( FLibrary, 'up_info_name' ) );
-  MLastError := upfunc_LastError(
-    GetProcedureAddress( FLibrary, 'up_last_error' ) );
+  MHasError := upfunc_HasError(
+    GetProcedureAddress( FLibrary, 'up_has_error' ) );
+  MErrorMsg := upfunc_ErrorMsg(
+    GetProcedureAddress( FLibrary, 'up_error_msg' ) );
 
-  if (MGetName = nil) or (MLastError = nil) then
+  if (MGetName = nil) or (MHasError = nil) or (MErrorMsg = nil) then
     Exit( False );
   FName := uplib_MethodName( MGetName() );
 
