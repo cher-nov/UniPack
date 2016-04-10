@@ -93,7 +93,7 @@ type { UPA Archives management class ══════════════�
     procedure PipelineEndUnpack();
     procedure PipelineFree();
     function PipelineSetNext( FileIndex: Integer;
-      SkipEmpty: Boolean = False ): Boolean;
+      SkipEmpty: Boolean = True ): Boolean;
     function PipelineGetData( OutBufOffset: SizeUInt ): SizeUInt;
 
   public
@@ -793,7 +793,7 @@ begin
     //skipped because FDplFileBytesDone will equal to 0
     repeat
       entry := GetEntry( FDplCurrentFile );
-      if entry^.Info.Size = FDplFileBytesDone then begin        
+      if entry^.Info.Size = FDplFileBytesDone then begin
         FDplCurrentFile += 1;
         PipelineResetState();
       end else begin
@@ -872,7 +872,7 @@ begin
 
   FDplFileBytesDone += Result;
   if FDplFileBytesDone = entry^.Info.Size then
-    PipelineSetNext( FDplCurrentFile+1, True );
+    PipelineSetNext( FDplCurrentFile+1 );
 end;
 
 end.
