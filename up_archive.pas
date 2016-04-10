@@ -4,7 +4,7 @@ unit up_archive;
 {$LONGSTRINGS ON}
 {$POINTERMATH ON}
 
-//TODO: Rewrite data pipeline as a separate class
+//TODO: Rewrite data pipeline as a separate helper class
 
 interface {════════════════════════════════════════════════════════════════════}
 
@@ -472,7 +472,6 @@ begin
       //another one bites the dust
       aMethod.EndPack();
       BytesOut := 0;
-      //TODO: assert( ChunkDataLeft > 0 ) ?
       upd_file += 1;
     end;
 

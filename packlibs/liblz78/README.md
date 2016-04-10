@@ -1,1 +1,0 @@
-LZ78 Compression plugin library
