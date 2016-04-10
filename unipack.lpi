@@ -30,22 +30,23 @@
         <FormatVersion Value="1"/>
       </local>
     </RunParams>
-    <Units Count="3">
+    <Units Count="4">
       <Unit0>
         <Filename Value="unipack.lpr"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="unipack"/>
       </Unit0>
       <Unit1>
         <Filename Value="up_methods.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="up_methods"/>
       </Unit1>
       <Unit2>
         <Filename Value="up_archive.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="up_archive"/>
       </Unit2>
+      <Unit3>
+        <Filename Value="routines.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit3>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -68,12 +69,6 @@
         <GenerateDebugInfo Value="False"/>
       </Debugging>
     </Linking>
-    <Other>
-      <CompilerMessages>
-        <MsgFileName Value=""/>
-      </CompilerMessages>
-      <CompilerPath Value="$(CompPath)"/>
-    </Other>
   </CompilerOptions>
   <Debugging>
     <Exceptions Count="3">

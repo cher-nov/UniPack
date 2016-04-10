@@ -5,84 +5,121 @@
 
 #define Z_PREFIX
 
-#include <stdlib.h>
-#include <memory.h>
 #include "zlib/zlib.h"
 #include "libzlib.h"
 
-int lib_error = Z_OK;
-size_t lib_compsize = 0;
+// amazing zlib build bug workaround
+#ifndef z_deflateInit
+  #define z_deflateInit deflateInit
+#endif
+#ifndef z_inflateInit
+  #define z_inflateInit inflateInit
+#endif
 
-/* initialization functions */
+static int lib_error = Z_OK;
+static up_datasize_t lib_pack_size = 0;
+static z_stream lib_zstream_pack;
+static z_stream lib_zstream_unpack;
 
-unsigned int get_name() {
+const char* up_info_name() {
   return DLL_NAME;
 }
 
-int get_version() {
+int up_info_version() {
   return DLL_VERSION;
 }
 
-/* compress functions */
-
-void* up_pack( void* data, size_t size_data ) {
-  if (lib_compsize > 0) {
-    lib_error = Z_ERRNO;
+const char* up_last_error() {
+  if (lib_error == Z_OK) {
     return NULL;
-  }
-
-  uLongf outlen = z_compressBound( size_data );
-  Bytef* outbuf = malloc( outlen );
-  lib_error = z_compress2( outbuf, &outlen, (Bytef*)data, size_data,
-                           Z_BEST_COMPRESSION );
-
-  if ( lib_error == Z_OK ) {
-    lib_compsize = outlen;
-    return realloc( outbuf, outlen );
   } else {
-    lib_compsize = 0;
-    free( outbuf );
-    return NULL;
+    int err = lib_error;
+    lib_error = Z_OK;
+    return z_zError(err);
   }
 }
 
-void* up_unpack( void* data, size_t size_data, size_t out_size ) {
-  Bytef* outbuf = malloc( out_size );
-  uLongf outlen = out_size;
-  lib_error = z_uncompress( outbuf, &outlen, (Bytef*)data, size_data );
+/* compression functions */
 
-  if ( lib_error == Z_OK ) {
-    return (void*)outbuf;
-  } else {
-    free( outbuf );
-    return NULL;
+void up_pack_init( up_datasize_t pack_size ) {
+  lib_pack_size = pack_size;
+  lib_zstream_pack.zalloc = Z_NULL;
+  lib_zstream_pack.zfree = Z_NULL;
+  lib_zstream_pack.opaque = Z_NULL;
+  z_deflateInit( &lib_zstream_pack, Z_BEST_COMPRESSION );
+}
+
+void up_pack_chunk( void* chunk_ptr, size_t chunk_size ) {
+  lib_zstream_pack.next_in = chunk_ptr;
+  lib_zstream_pack.avail_in = chunk_size;
+}
+
+size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
+  lib_zstream_pack.next_out = outbuf_ptr;
+  lib_zstream_pack.avail_out = outbuf_size;
+
+  int result, flush, input_size;
+  input_size = lib_zstream_pack.avail_in;
+  flush = (lib_pack_size > input_size) ? Z_NO_FLUSH : Z_FINISH;
+  result = z_deflate( &lib_zstream_pack, flush );
+
+  switch (result) {
+    case Z_OK:
+    case Z_STREAM_END:
+      lib_pack_size -= input_size - lib_zstream_pack.avail_in;
+      if (data_left != NULL) { *data_left = lib_zstream_pack.avail_in; }
+      return outbuf_size - lib_zstream_pack.avail_out;
+    break;
+
+    default:
+      lib_error = result;
+      return 0;
   }
 }
 
-size_t compsize() {
-  size_t retsz = lib_compsize;
-  lib_compsize = 0;
-  return retsz;
+void up_pack_end() {
+  z_deflateEnd( &lib_zstream_pack );
+  lib_pack_size = 0;
 }
 
-/* errors functions */
+/* decompression functions */
 
-int get_err() {
-  int errlev = lib_error;
-  lib_error = Z_OK;
-  return errlev;
+void up_unpack_init( up_datasize_t unpack_size ) {
+  lib_zstream_unpack.zalloc = Z_NULL;
+  lib_zstream_unpack.zfree = Z_NULL;
+  lib_zstream_unpack.opaque = Z_NULL;
+  lib_zstream_unpack.avail_in = 0;
+  lib_zstream_unpack.next_in = Z_NULL;
+  z_inflateInit( &lib_zstream_unpack );
 }
 
-const char* err_str( int errlev ) {
-  return z_zError( errlev );
+void up_unpack_chunk( void* chunk_ptr, size_t chunk_size ) {
+  lib_zstream_unpack.next_in = chunk_ptr;
+  lib_zstream_unpack.avail_in = chunk_size;
 }
 
-/* memory management */
+size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
+  lib_zstream_unpack.next_out = outbuf_ptr;
+  lib_zstream_unpack.avail_out = outbuf_size;
 
-void* realloc_mem( void* ptr, size_t size_new ) {
-  return realloc( ptr, size_new );
+  int result;
+  result = z_inflate( &lib_zstream_unpack, Z_NO_FLUSH );
+
+  switch (result) {
+    case Z_OK:
+    case Z_STREAM_END:
+      if (data_left != NULL) { *data_left = lib_zstream_unpack.avail_in; }
+      return outbuf_size - lib_zstream_unpack.avail_out;
+    break;
+
+    default:
+      lib_error = result;
+      return 0;
+  }
 }
 
-void free_mem( void* ptr ) {
-  free( ptr );
+void up_unpack_end() {
+  z_inflateEnd( &lib_zstream_unpack );
 }
+
+

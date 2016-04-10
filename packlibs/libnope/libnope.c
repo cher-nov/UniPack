@@ -3,81 +3,115 @@
   (c) KoDi studio, 2015
 */
 
-#include <stdlib.h>
 #include <memory.h>
 #include "libnope.h"
 
-int lib_error = E_OK;
-size_t lib_compsize = 0;
+static int lib_error = UP_OK;
+static void* lib_pack_chunk;
+static up_datasize_t lib_pack_size;
+static void* lib_unpack_chunk;
+static up_datasize_t lib_unpack_size;
 
-/* initialization functions */
+/* plugin info functions */
 
-unsigned int get_name() {
+const char* up_info_name() {
   return DLL_NAME;
 }
 
-int get_version() {
+int up_info_version() {
   return DLL_VERSION;
 }
 
-/* compress functions */
+const char* up_last_error() {
+  int err = lib_error;
+  lib_error = UP_OK;
 
-void* compress( void* data, size_t size_data ) {
-  if (data == NULL)  {
-    lib_error = E_BAD_INPUT;
-    return NULL;
+  switch (err) {
+    case UP_OK:
+      return NULL;
+    break;
+    case UP_INTERNAL_ERROR:
+      return "internal plugin error";
+    break;
+    case UP_DATA_ERROR:
+      return "invalid data";
+    break;
+    case UP_MEMORY_ERROR:
+      return "plugin memory error";
+    break;
   }
 
-  if (lib_compsize != 0) {
-    lib_error = E_LOST_SIZE;
-    return NULL;
-  }
-
-  lib_compsize = size_data;
-  return memcpy( malloc(size_data), data, size_data );
-}
-
-void* decompress( void* data, size_t size_data, size_t out_size ) {
-  if (data == NULL) {
-    lib_error = E_BAD_INPUT;
-    return NULL;
-  }
-
-  return memcpy( malloc(out_size), data, size_data );
-}
-
-size_t compsize() {
-  size_t retsz = lib_compsize;
-  lib_compsize = 0;
-  return retsz;
-}
-
-/* errors functions */
-
-int get_err() {
-  int errlev = lib_error;
-  lib_error = E_OK;
-  return errlev;
-}
-
-const char* err_str( int errlev ) {
-  switch (errlev) {
-    case E_OK:
-      return "no errors";
-    case E_BAD_INPUT:
-      return "wrong input data";
-    case E_LOST_SIZE:
-      return "take off your data size";
-  }
   return "unknown error";
 }
 
-/* memory management */
+/* compression functions */
 
-void* realloc_mem( void* ptr, size_t size_new ) {
-  return realloc( ptr, size_new );
+void up_pack_init( up_datasize_t pack_size ) {
+  up_pack_chunk(NULL, 0);
 }
 
-void free_mem( void* ptr ) {
-  free( ptr );
+void up_pack_chunk( void* chunk_ptr, size_t chunk_size ) {
+  lib_pack_chunk = chunk_ptr;
+  lib_pack_size = chunk_size;
 }
+
+size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
+  if ( (lib_pack_chunk == NULL) || (lib_pack_size == 0) ) {
+    lib_error = UP_DATA_ERROR;
+    return 0;
+  }
+
+  if ( (outbuf_ptr == NULL) || (outbuf_size == 0) ) {
+    lib_error = UP_MEMORY_ERROR;
+    return 0;
+  }
+
+  size_t copy_size = (outbuf_size < lib_pack_size) ? outbuf_size : lib_pack_size;
+  memcpy( outbuf_ptr, lib_pack_chunk, copy_size );
+  lib_pack_chunk += copy_size;
+  lib_pack_size -= copy_size;
+  if (data_left != NULL) { *data_left = lib_pack_size; }
+
+  return copy_size;
+}
+
+void up_pack_end() {
+  up_pack_init(0);
+}
+
+/* decompression functions */
+
+void up_unpack_init( up_datasize_t unpack_size ) {
+  up_unpack_chunk(NULL, 0);
+}
+
+void up_unpack_chunk( void* chunk_ptr, size_t chunk_size ) {
+  lib_unpack_chunk = chunk_ptr;
+  lib_unpack_size = chunk_size;
+}
+
+size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
+  if ( (lib_unpack_chunk == NULL) || (lib_unpack_size == 0) ) {
+    lib_error = UP_DATA_ERROR;
+    return 0;
+  }
+
+  if ( (outbuf_ptr == NULL) || (outbuf_size == 0) ) {
+    lib_error = UP_MEMORY_ERROR;
+    return 0;
+  }
+
+  size_t copy_size = (outbuf_size < lib_unpack_size) ? outbuf_size : lib_unpack_size;
+  memcpy( outbuf_ptr, lib_unpack_chunk, copy_size );
+  lib_unpack_chunk += copy_size;
+  lib_unpack_size -= copy_size;
+  if (data_left != NULL) { *data_left = lib_unpack_size; }
+
+  return copy_size;
+}
+
+void up_unpack_end() {
+  up_unpack_init(0);
+}
+
+

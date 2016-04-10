@@ -8,189 +8,233 @@ interface {═══════════════════════
 uses
   Classes, SysUtils, dynlibs;
 
+{ –=────────────────────────────────────────────────────────────────────────=– }
+type { Auxiliary types for TUniPackMethod ════════════════════════════════════ }
+
+  uplib_MethodName = packed array[0..3] of Char;
+
+  upfunc_GetName =
+    function(): PChar; cdecl;
+  upfunc_GetVersion =
+    function(): Integer; cdecl;
+  upfunc_LastError =
+    function(): PChar; cdecl;
+  upfunc_InitPack =
+    procedure( pack_sz: QWord ); cdecl;
+  upfunc_PackSetChunk =
+    procedure( chunk: Pointer; chunk_sz: SizeUInt ); cdecl;
+  upfunc_PackStep =
+    function( outbuf: Pointer; outbuf_sz: SizeUInt;
+      var data_left: SizeUInt ): SizeUInt; cdecl;
+  upfunc_EndPack =
+    procedure(); cdecl;
+  upfunc_InitUnpack =
+    procedure( unpack_sz: QWord ); cdecl;
+  upfunc_UnpackSetChunk =
+    procedure( chunk: Pointer; chunk_sz: SizeUInt ); cdecl;
+  upfunc_UnpackStep =
+    function( outbuf: Pointer; outbuf_sz: SizeUInt;
+      var data_left: SizeUInt ): SizeUInt; cdecl;
+  upfunc_EndUnpack =
+    procedure(); cdecl;
+
 const
-  UP_NOERR = 0;
-  UP_NAMELEN = SizeOf(LongWord);
+  upNilMethod : uplib_MethodName = #0;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
-type { Auxiliary types for TUniMethod ════════════════════════════════════════ }
+type { TUniPackMethod - UniPack method library ═══════════════════════════════ }
 
-  TUniMethodName = packed array[0..UP_NAMELEN-1] of Char;
-  TUniMethodWord = LongWord;
-
-  TUniPackGetName =
-    function(): TUniMethodWord; cdecl;
-  TUniPackGetVersion =
-    function(): Integer; cdecl;
-  TUniPackCompress =
-    function( data: Pointer; size: SizeUInt ): Pointer; cdecl;
-  TUniPackDecompress =
-    function( data: Pointer; size: SizeUInt; outsize: SizeUInt ): Pointer; cdecl;
-  TUniPackCompSize =
-    function(): SizeUInt; cdecl;
-  TUniPackGetErr =
-    function(): Integer; cdecl;
-  TUniPackErrStr =
-    function( errlev: Integer ): PChar; cdecl;
-  TUniPackReallocMem =
-    function( ptr: Pointer; size: SizeUInt ): Pointer; cdecl;
-  TUniPackFreeMem =
-    procedure( ptr: Pointer ); cdecl;
-
-{ –=────────────────────────────────────────────────────────────────────────=– }
-type { TUniMethod - UniPack method library ═══════════════════════════════════ }
-
-  TUniMethod = class
+  TUniPackMethod = class
   strict private
     //methods
-    MCompress : TUniPackCompress;
-    MCompSize : TUniPackCompSize;
-    MDecompress : TUniPackDecompress;
-    MGetErr : TUniPackGetErr;
-    MErrStr : TUniPackErrStr;
-    MReallocMem : TUniPackReallocMem;
-    MFreeMem : TUniPackFreeMem;
+    MLastError : upfunc_LastError;
+    MInitPack : upfunc_InitPack;
+    MPackSetChunk : upfunc_PackSetChunk;
+    MPackStep : upfunc_PackStep;
+    MEndPack : upfunc_EndPack;
+    MInitUnpack : upfunc_InitUnpack;
+    MUnpackSetChunk : upfunc_UnpackSetChunk;
+    MUnpackStep : upfunc_UnpackStep;
+    MEndUnpack : upfunc_EndUnpack;
     //variables
+    FIndex : Integer;
     FLibrary : TLibHandle;
     FLibFile : String;
-    FName : TUniMethodName;
+    FName : uplib_MethodName;
     FVersion : Integer;
-  public
-    constructor Create( ALibFile: String );
-    destructor Destroy(); override;
+    FCanPack : Boolean;
+    FCanUnpack : Boolean;
 
-    property Compress: TUniPackCompress read MCompress;
-    property CompSize: TUniPackCompSize read MCompSize;
-    property Decompress: TUniPackDecompress read MDecompress;
-    property GetErr: TUniPackGetErr read MGetErr;
-    property ErrStr: TUniPackErrStr read MErrStr;
-    property ReallocMem: TUniPackReallocMem read MReallocMem;
-    property FreeMem: TUniPackFreeMem read MFreeMem;
+    function LoadLib( const ALibFile: String ): Boolean;
+  public
+    class function Load( const ALibFile: String ): Boolean;
+    destructor Destroy(); override;
+    class function Count(): Integer;
+    class function Get( AName: uplib_MethodName ): TUniPackMethod; overload;
+    class function Get( AIndex: Integer ): TUniPackMethod; overload;
+
+    property LastError: upfunc_LastError read MLastError;
+    property InitPack: upfunc_InitPack read MInitPack;
+    property PackSetChunk: upfunc_PackSetChunk read MPackSetChunk;
+    property PackStep: upfunc_PackStep read MPackStep;
+    property EndPack: upfunc_EndPack read MEndPack;
+    property InitUnpack: upfunc_InitUnpack read MInitUnpack;
+    property UnpackSetChunk: upfunc_UnpackSetChunk read MUnpackSetChunk;
+    property UnpackStep: upfunc_UnpackStep read MUnpackStep;
+    property EndUnpack: upfunc_EndUnpack read MEndUnpack;
 
     property LibFile: String read FLibFile;
-    property Name: TUniMethodName read FName;
+    property Name: uplib_MethodName read FName;
     property Version: Integer read FVersion;
+
+    property CanPack: Boolean read FCanPack;
+    property CanUnpack: Boolean read FCanUnpack;
   end;
 
-{ –=────────────────────────────────────────────────────────────────────────=– }
-
-var
-  UPMethods: TList;
-  UPLoadError : Boolean = False;
-
-function WordToName( AWord: TUniMethodWord ): TUniMethodName;
-function GetMethod( AName: TUniMethodName ): TUniMethod;
-function LoadMethodLib( ALibFile: String ): Boolean;
-procedure UnloadAllMethods();
 
 implementation {═══════════════════════════════════════════════════════════════}
 
-uses StrUtils;
+const
+  UP_NO_INDEX = -1;
+
+var
+  upMethods: TList;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
+{ ═ TUniPackMethod ─────────────────────────────────────────────────────────── }
 
-function WordToName( AWord: TUniMethodWord ): TUniMethodName;
+class function TUniPackMethod.Load( const ALibFile: String ): Boolean;
+var
+  method: TUniPackMethod;
 begin
-  Result := LeftStr( PChar(@AWord), UP_NAMELEN );
+  method := TUniPackMethod.Create();
+
+  Result := method.LoadLib( ALibFile );
+  if Result then
+    Result := Get( method.FName ) = nil;
+
+  if Result then begin
+    method.FIndex := upMethods.Add( method );
+  end else begin
+    method.FIndex := UP_NO_INDEX;
+    method.Destroy();
+  end;
 end;
 
-function GetMethod( AName: TUniMethodName ): TUniMethod;
+destructor TUniPackMethod.Destroy();
+begin
+  if FLibrary <> NilHandle then
+    UnloadLibrary( FLibrary );
+  if FIndex <> UP_NO_INDEX then
+    upMethods.Delete( FIndex );
+  inherited Destroy();
+end;
+
+class function TUniPackMethod.Count(): Integer;
+begin
+  Result := upMethods.Count;
+end;
+
+class function TUniPackMethod.Get( AName: uplib_MethodName ): TUniPackMethod;
 var
   i : Integer;
 begin
   Result := nil;
-  for i := 0 to UPMethods.Count-1 do begin
-    if Assigned(Result) then Break;
-    Result := TUniMethod( UPMethods[i] );
-    if ( Result.Name <> AName ) then Result := nil;
+  if AName = upNilMethod then Exit;
+
+  i := 0;
+  while (Result = nil) and (i < upMethods.Count) do begin
+    Result := TUniPackMethod( upMethods[i] );
+    if Result.Name <> AName then Result := nil;
+    i += 1;
   end;
 end;
 
-function LoadMethodLib( ALibFile: String ): Boolean;
-var
-  load: TUniMethod;
+class function TUniPackMethod.Get( AIndex: Integer ): TUniPackMethod;
 begin
-  load := TUniMethod.Create( ALibFile );
-  Result := True;
-
-  if UPLoadError                       then Result := False else
-  if ( GetMethod( load.Name ) <> nil ) then Result := False;
-
-  if Result then
-    UPMethods.Add( load )
-  else
-    load.Destroy();
-end;
-
-procedure UnloadAllMethods();
-var
-  i : Integer;
-begin
-  for i := 0 to UPMethods.Count-1 do
-    TUniMethod( UPMethods[i] ).Destroy();
-  UPMethods.Clear();
-end;
-
-{ ═ TUniMethod ─────────────────────────────────────────────────────────────── }
-
-constructor TUniMethod.Create( ALibFile: String );
-var
-  MGetName : TUniPackGetName;
-  MGetVersion : TUniPackGetVersion;
-begin
-  FLibFile := ExtractFileName( ALibFile );
-  FLibrary := LoadLibrary( ALibFile );
-
-  if ( FLibrary = NilHandle ) then begin
-    UPLoadError := True;
-    Exit;
+  try
+    Result := TUniPackMethod( upMethods[AIndex] );
+  except
+    Result := nil;
   end;
-
-  MGetName := TUniPackGetName( GetProcedureAddress( FLibrary, 'get_name' ) );
-  if ( MGetName = nil ) then begin
-    UPLoadError := True;
-    Exit;
-  end;
-
-  FName := ReverseString( WordToName( MGetName() ) );
-
-  MCompress := TUniPackCompress( GetProcedureAddress( FLibrary, 'compress' ) );
-  MDecompress := TUniPackDecompress( GetProcedureAddress( FLibrary, 'decompress' ) );
-  MCompSize := TUniPackCompSize( GetProcedureAddress( FLibrary, 'compsize' ) );
-
-  //alternative syntax for compress() and decompress()
-  if ( MCompress = nil ) then
-    MCompress := TUniPackCompress( GetProcedureAddress( FLibrary, 'up_pack' ) );
-  if ( MDecompress = nil ) then
-    MDecompress := TUniPackDecompress( GetProcedureAddress( FLibrary, 'up_unpack' ) );
-
-  MGetErr := TUniPackGetErr( GetProcedureAddress( FLibrary, 'get_err' ) );
-  MErrStr := TUniPackErrStr( GetProcedureAddress( FLibrary, 'err_str' ) );
-
-  MReallocMem := TUniPackReallocMem( GetProcedureAddress( FLibrary, 'realloc_mem' ) );
-  MFreeMem := TUniPackFreeMem( GetProcedureAddress( FLibrary, 'free_mem' ) );
-
-  MGetVersion := TUniPackGetVersion( GetProcedureAddress( FLibrary, 'get_version' ) );
-  FVersion := MGetVersion();
-
-  UPLoadError := False;
-end;
-
-destructor TUniMethod.Destroy();
-begin
-  UnloadLibrary( FLibrary );
 end;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
 
-initialization {═══════════════════════════════════════════════════════════════}
+function TUniPackMethod.LoadLib( const ALibFile: String ): Boolean;
+var
+  MGetName : upfunc_GetName;
+  MGetVersion : upfunc_GetVersion;
+begin
+  FLibFile := ExtractFileName( ALibFile );
 
-UPMethods := TList.Create();
+  FLibrary := LoadLibrary( ALibFile );
+  if FLibrary = NilHandle then
+    Exit( False );
 
-finalization {═════════════════════════════════════════════════════════════════}
+  MGetName := upfunc_GetName(
+    GetProcedureAddress( FLibrary, 'up_info_name' ) );
+  MLastError := upfunc_LastError(
+    GetProcedureAddress( FLibrary, 'up_last_error' ) );
 
-UnloadAllMethods();
-UPMethods.Destroy();
+  if (MGetName = nil) or (MLastError = nil) then
+    Exit( False );
+  FName := uplib_MethodName( MGetName() );
+
+  MInitPack := upfunc_InitPack(
+    GetProcedureAddress( FLibrary, 'up_pack_init' ) );
+  MPackSetChunk := upfunc_PackSetChunk(
+    GetProcedureAddress( FLibrary, 'up_pack_chunk' ) );
+  MPackStep := upfunc_PackStep(
+    GetProcedureAddress( FLibrary, 'up_pack_step' ) );
+  MEndPack := upfunc_EndPack(
+    GetProcedureAddress( FLibrary, 'up_pack_end' ) );
+
+  FCanPack := Assigned(MInitPack) and Assigned(MEndPack)
+    and Assigned(MPackSetChunk) and Assigned(MPackStep);
+
+  MInitUnpack := upfunc_InitUnpack(
+    GetProcedureAddress( FLibrary, 'up_unpack_init' ) );
+  MUnpackSetChunk := upfunc_UnpackSetChunk(
+    GetProcedureAddress( FLibrary, 'up_unpack_chunk' ) );
+  MUnpackStep := upfunc_UnpackStep(
+    GetProcedureAddress( FLibrary, 'up_unpack_step' ) );
+  MEndUnpack := upfunc_EndUnpack(
+    GetProcedureAddress( FLibrary, 'up_unpack_end' ) );
+
+  FCanUnpack := Assigned(MInitUnpack) and Assigned(MEndUnpack)
+    and Assigned(MUnpackSetChunk) and Assigned(MUnpackStep);
+
+  if not FCanPack and not FCanUnpack then
+    Exit( False );
+
+  MGetVersion := upfunc_GetVersion(
+    GetProcedureAddress( FLibrary, 'up_info_version' ) );
+
+  if MGetVersion <> nil then
+    FVersion := MGetVersion()
+  else
+    FVersion := -1;
+
+  Result := True;
+end;
+
+{ –=────────────────────────────────────────────────────────────────────────=– }
+
+procedure upUnloadAllMethods();
+begin
+  while upMethods.Count > 0 do
+    TUniPackMethod.Get( upMethods.Count-1 ).Destroy();
+end;
+
+initialization
+
+  upMethods := TList.Create();
+
+finalization
+
+  upUnloadAllMethods();
+  upMethods.Destroy();
 
 end.
 

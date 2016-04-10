@@ -6,8 +6,6 @@
 #ifndef __LIBZLIB_H__
 #define __LIBZLIB_H__
 
-#include <stdio.h>
-
 #ifndef DLL_EXPORT
   #if defined(_WIN32)
     #define DLL_EXPORT __cdecl __declspec( dllexport )
@@ -20,20 +18,31 @@
   #endif
 #endif
 
-#define DLL_NAME 'ZLIB'
+#define DLL_NAME "ZLIB"
 #define DLL_VERSION 128
 
-DLL_EXPORT unsigned int get_name();
-DLL_EXPORT int get_version();
+typedef unsigned long long int up_datasize_t;
 
-DLL_EXPORT void* up_pack( void*, size_t );
-DLL_EXPORT void* up_unpack( void*, size_t, size_t );
-DLL_EXPORT size_t compsize();
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-DLL_EXPORT int get_err();
-DLL_EXPORT const char* err_str( int );
+DLL_EXPORT const char* up_info_name();
+DLL_EXPORT int up_info_version();
+DLL_EXPORT const char* up_last_error();
 
-DLL_EXPORT void* realloc_mem( void*, size_t );
-DLL_EXPORT void free_mem( void* );
+DLL_EXPORT void up_pack_init( up_datasize_t );
+DLL_EXPORT void up_pack_chunk( void*, size_t );
+DLL_EXPORT size_t up_pack_step( void*, size_t, size_t* );
+DLL_EXPORT void up_pack_end();
+
+DLL_EXPORT void up_unpack_init( up_datasize_t );
+DLL_EXPORT void up_unpack_chunk( void*, size_t );
+DLL_EXPORT size_t up_unpack_step( void*, size_t, size_t* );
+DLL_EXPORT void up_unpack_end();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __LIBZLIB_H__
