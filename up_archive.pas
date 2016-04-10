@@ -4,649 +4,880 @@ unit up_archive;
 {$LONGSTRINGS ON}
 {$POINTERMATH ON}
 
+//TODO: Rewrite data pipeline as a separate class
+
 interface {════════════════════════════════════════════════════════════════════}
 
 uses
-  Classes, SysUtils, up_methods;
+  Classes, SysUtils, int_list, up_methods;
 
 const
-  UPA_FILEEXT = '.upa';
-  UPA_SIGN = 'UPA';
-  UPA_MAXFILES = 65535;
+  upaFileExt = '.upa';
+  upaFileSign = 'UPA';
+  upaMaxFiles = 65535;
+  upaInvalidIndex = -1;
+  upaPackBufStd = 512 * 1024; // 512 Kb
+  upaOutputBufStd = 512 * 1024;
 
 type { UPA Archives management class ═════════════════════════════════════════ }
 
-  TEntryData = ( DS_NODATA, DS_APPMEM, DS_LIBMEM, DS_FILE );
-
-  PFileEntry = ^TFileEntry;
-  TFileEntry = record
-    FileName : String;
-    FileSize : SizeUInt;
-    FileAttr : Byte;
-    FileTime : LongInt;
-    //next fields are for internal use
-    isPacked : Boolean;
-    DataSize : SizeUInt;
-    case Storage: TEntryData of
-      DS_NODATA: ();
-      DS_APPMEM, DS_LIBMEM: (
-        MemoryPtr : Pointer );
-      DS_FILE: (
-        FileHandle : THandle;
-        DataOffset : SizeUInt );
+  TFileInfoUPA = record
+    Name : String;
+    Size : QWord;
+    Attr : Byte;
+    Time : Int64;
+    PackSize : QWord;
   end;
 
-  TErrorUPA = ( UPA_OK, UPA_NOFILE, UPA_BADSIGN, UPA_NOMETHOD,
-    UPA_NOMEMORY, UPA_LIBERROR );
+  TErrorUPA = ( eupOK, eupFileNotFound, eupFileError, eupInvalidArchive,
+    eupUnknownMethod, eupMethodNotImplemented, eupInvalidInput, eupMemoryError,
+    eupMethodError );
+
+  //for internal use, do not touch
+  PFileEntryUPA = ^TFileEntryUPA;
+  TFileEntryUPA = record
+    Info : TFileInfoUPA;
+    Handle : THandle;
+    StreamOffset : QWord; //used only for unpacking
+    SkipBytesBefore : QWord; { needed for correct deletion of packed files
+                               from solid stream to skip them from pipeline }
+  end;
 
   TUniPackArchive = class
   strict private
     FFileName : String;
-    FHandle : THandle; //archive file handle
-    FFiles : TList; //contains TFileEntry for each file
-    FMethod : TUniMethod;
+    FFileHandle : THandle; //archive file handle
+    FFiles : TList; //contains PFileEntryUPA for each file
+    FStreamStartPos : QWord;
+    FStreamSize : QWord;
+    FPackedCount : Integer; //count of packed files
+    FAllFilesSize : QWord;
     FSolid : Boolean;
-    function AddEntry( AName: String = ''; ASize: SizeUInt = 0;
-      AAttr: Byte = 0; ATime: LongInt = -1 ): Integer;
-    procedure SetEntryData( Index: Integer; APacked: Boolean; ASize: SizeUInt;
-      ALibMem: Boolean; AMemory: Pointer ); overload; // DS_APPMEM / DS_LIBMEM
-    procedure SetEntryData( Index: Integer; APacked: Boolean; ASize: SizeUInt;
-      AHandle: THandle; AOffset: SizeUInt ); overload; // DS_FILE
-    function GetEntry( Index: Integer ): TFileEntry;
-    function GetCount: Integer;
-    function GetMethodName: TUniMethodName;
-    procedure CloseHandle( Index: Integer );
-    procedure FreeBuffer( Index: Integer );
-    procedure FileToMemory( Index: Integer; AClose: Boolean = True );
-    procedure MemoryToFile( Index: Integer; Handle: THandle; Offset: SizeUInt );
+    FMethod : TUniPackMethod;
+    FPackBufSize : SizeUInt;
+    FOutputBufSize : SizeUInt;
+
+    FDplPackedBuf : Pointer;
+    FDplDataOutBuf : Pointer;
+    FDplCurrentFile : Integer;
+    FDplFileBytesDone : QWord;
+    FDplPackedDataPos : QWord;
+    FDplChunkDataLeft : SizeUInt;
+    FDplSkippedBefore : QWord; //needed for solid stream
+
+    procedure Init(); inline;
+
+    function UPA_GetSaveArchName( var NewFileName: String ): Boolean;
+    function UPA_CalculateStreamPos(): QWord;
+    function UPA_CalculateStreamSize(): QWord;
+    function UPA_ReadAndCheckHeader( ArchHandle: THandle ): TErrorUPA;
+    procedure UPA_WriteHeader( ArchHandle: THandle; aMethod: TUniPackMethod;
+      aSolid: Boolean );
+    procedure UPA_RemapArchive( const ArchName: String; isTemp: Boolean;
+      aMethod: TUniPackMethod; aSolid: Boolean; aStreamStartPos: QWord;
+      aPackedSizes: array of QWord );
+    function UPA_GetFileAttr( FileName: String ): Byte;
+    procedure UPA_SetFileAttr( FileName: String; AttrUPA: Byte );
+    function FAT_ReadEntry( ArchHandle: THandle ): TFileInfoUPA;
+    procedure FAT_WriteEntry( ArchHandle: THandle; FileIndex: Integer;
+      NewPackSize: QWord );
+
+    function AddEntry( const aInfo: TFileInfoUPA; aHandle: THandle;
+      aOffsetStream: QWord ): Integer;
+    function GetEntry( Index: Integer ): PFileEntryUPA; inline;
+    procedure CloseHandle( Handle: THandle ); inline;
+    function FindFirstNotEmptyFile( StartIndex: Integer ): Integer;
+
+    procedure PipelineInit();
+    procedure PipelineResetState( Forced: Boolean = False );
+    procedure PipelineEndUnpack();
+    procedure PipelineFree();
+    function PipelineSetNext( FileIndex: Integer;
+      SkipEmpty: Boolean = False ): Boolean;
+    function PipelineGetData( OutBufOffset: SizeUInt ): SizeUInt;
+
   public
-    constructor Create( UPAFile: String; OpenFile: Boolean = False );
+    constructor Create();
     destructor Destroy(); override;
-    procedure DestroySave();
+    function Open( FileName: String ): TErrorUPA;
+    function Save( NewFileName: String; aMethod: TUniPackMethod;
+      aSolid: Boolean; RemapToNew: Boolean ): TErrorUPA;
+    procedure Close();
+
     function AddFile( FileName: String ): Boolean;
-    procedure WriteFile( Index: Integer; ADir: String = '' );
-    procedure Clear();
-    function PackData( Index: Integer ): Boolean;
-    function UnpackData( Index: Integer ): Boolean;
-    procedure SetMethod( AMethod: TUniMethod );
-    property Files[Index: Integer]: TFileEntry read GetEntry;
-    property Count: Integer read GetCount;
-    property Solid: Boolean read FSolid write FSolid;
-    property Method: TUniMethodName read GetMethodName;
+    procedure DeleteFile( Index: Integer );
+    function Count(): Integer;
+    function FileInfo( Index: Integer ): TFileInfoUPA;
+    function WriteFiles( DirPath: String; FileIndexes: TIntList = nil ): TErrorUPA;
+
+    property Solid: Boolean read FSolid;
+    property Method: TUniPackMethod read FMethod;
+    property PackBufSize: SizeUInt read FPackBufSize write FPackBufSize;
+    property OutputBufSize: SizeUInt read FOutputBufSize write FOutputBufSize;
   end;
-
-{ –=────────────────────────────────────────────────────────────────────────=– }
-
-function OpenUPA( UPAFile: String ): TUniPackArchive;
-function StrTimePOSIX( TimePOSIX: LongInt ): String;
-
-function GetFileSize( FileHandle: THandle ): Int64;
-
-var
-  UPALastError : TErrorUPA = UPA_OK;
 
 implementation {═══════════════════════════════════════════════════════════════}
 
-uses DateUtils;
+uses routines;
 
 const
-  upaReadOnly = $01; upaHidden = $02; upaSystem = $04; upaArchive = $08;
+  upaAReadOnly = $01;
+  upaAHidden = $02;
+  upaASystem = $04;
+  upaAArchive = $08;
 
 type
-  THeaderUPA = packed record
+
+  TArchHeaderUPA = packed record
     Sign : packed array[0..2] of Char;
-    Method : TUniMethodName;
+    Method : uplib_MethodName;
     isSolid : ByteBool;
-    FileNum : Word;
+    FileCount : Word;
   end;
 
-  //TEntryFAT doesn't contain filename because it's size is dynamic
-  TEntryFAT = packed record
+  //TArchEntryUPA doesn't contain filename because it's size is dynamic
+  TArchEntryUPA = packed record
     PackSize : QWord;
     FileSize : QWord;
     FileAttr : Byte;
-    FileTime : LongInt;
+    FileTime : LongInt; //TODO: change to Int64 in standard
   end;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
+{ ═ TUniPackArchive ────────────────────────────────────────────────────────── }
 
-function read_fatfname( FileHandle: THandle ): String;
-var
-  len : Byte; //zero-based, meant range is 1..256
+//returns if file name is temporary
+function TUniPackArchive.UPA_GetSaveArchName( var NewFileName: String ): Boolean;
 begin
-  FileRead( FileHandle, len, 1 );
-  SetLength( Result, len+1 );
-  FileRead( FileHandle, PChar(Result)^, len+1 );
-end;
-
-procedure write_fatfname( FileHandle: THandle; FileName: String );
-var
-  len : Byte;
-begin
-  len := Byte( Length(FileName)-1 );
-  FileWrite( FileHandle, len, 1 );
-  FileWrite( FileHandle, PChar(FileName)^, len+1 );
-end;
-
-function GetFileSize( FileHandle: THandle ): Int64;
-var
-  seek : Int64;
-begin
-  //getting file size in C style
-  seek := FileSeek( FileHandle, 0, fsFromCurrent );
-  Result := FileSeek( FileHandle, 0, fsFromEnd );
-  FileSeek( FileHandle, seek, fsFromBeginning );
-end;
-
-function UniqueFileName( FileName: String ): String;
-var
-  suff : Integer;
-  FilePath, FileExt : String;
-begin
-  Result := FileName;
-  suff := 0;
-  FilePath := ExtractFilePath( FileName );
-  FileExt  := ExtractFileExt ( FileName );
-  FileName := ChangeFileExt( ExtractFileName( FileName ), '' );
-  while FileExists( Result ) do begin
-    suff += 1;
-    Result := FilePath+FileName+ '_'+IntToStr(suff) +FileExt;
+  if NewFileName = EmptyStr then begin
+    if FFileHandle = UnusedHandle then
+      Exit( False );
+    NewFileName := ChangeFileExt( FFileName, '.tmp' );
+    Result := True;
+  end else begin
+    NewFileName := ExpandFileName( NewFileName );
+    Result := False;
   end;
+  NewFileName := UniqueFileName( NewFileName );
 end;
 
-{ POSIX filetime routines ════════════════════════════════════════════════════ }
-
-function GetFileTimePOSIX( FileHandle: THandle ): LongInt;
+function TUniPackArchive.UPA_CalculateStreamPos(): QWord;
+var
+  i : Integer;
 begin
-  Result := FileGetDate( FileHandle );
-  if ( Result <> -1 ) then
-    Result := LongInt( DateTimeToUnix( DosDateTimeToDateTime( Result ) ) );
+  Result := SizeOf( TArchHeaderUPA ) + SizeOf( TArchEntryUPA ) * FFiles.Count;
+  for i := 0 to FFiles.Count-1 do
+    Result += Length( GetEntry(i)^.Info.Name ) + 1; // +1 for length descriptor
 end;
 
-procedure SetFileTimePOSIX( FileHandle: THandle; TimePOSIX: LongInt );
+function TUniPackArchive.UPA_CalculateStreamSize(): QWord;
 begin
-  FileSetDate( FileHandle,
-    DateTimeToDosDateTime( UnixToDateTime( Int64( TimePOSIX ) ) )
-  );
+  Result := GetFileSize( FFileHandle ) - FStreamStartPos;
 end;
 
-{ UPA file attributes format routines ════════════════════════════════════════ }
+function TUniPackArchive.UPA_ReadAndCheckHeader( ArchHandle: THandle ): TErrorUPA;
+var
+  header : TArchHeaderUPA;
+  new_method : TUniPackMethod;
+begin
+  FileRead( ArchHandle, header, SizeOf(header) );
+  if header.Sign <> upaFileSign then
+    Exit( eupInvalidArchive );
 
-function eval( cond: Integer ): Boolean;
-   begin Result := cond <> 0;
-     end;
+  new_method := TUniPackMethod.Get( header.Method );
+  if new_method = nil then
+    Exit( eupUnknownMethod );
+  if not new_method.CanUnpack then
+    Exit( eupMethodNotImplemented );
 
-function GetFileAttrUPA( FileName: String ): Byte;
+  Close();
+  FPackedCount := Header.FileCount;
+  FSolid := Header.isSolid;
+  FMethod := new_method;
+
+  Result := eupOK;
+end;
+
+procedure TUniPackArchive.UPA_WriteHeader( ArchHandle: THandle;
+  aMethod: TUniPackMethod; aSolid: Boolean );
+var
+  header : TArchHeaderUPA;
+begin
+  header.Sign := upaFileSign;
+  header.Method := aMethod.Name;
+  header.isSolid := aSolid;
+  header.FileCount := FFiles.Count;
+  FileWrite( ArchHandle, header, SizeOf(header) );
+end;
+
+procedure TUniPackArchive.UPA_RemapArchive( const ArchName: String;
+  isTemp: Boolean; aMethod: TUniPackMethod; aSolid: Boolean;
+  aStreamStartPos: QWord; aPackedSizes: array of QWord );
+var
+  entry : PFileEntryUPA;
+  pos_stream : QWord;
+  i : Integer;
+begin
+  FSolid := aSolid;
+  FMethod := aMethod;
+
+  FileClose( FFileHandle );
+  for i := FPackedCount to FFiles.Count-1 do
+    CloseHandle( GetEntry(i)^.Handle );
+
+  if isTemp then begin
+    SysUtils.DeleteFile( FFileName );
+    RenameFile( ArchName, FFileName );
+  end else begin
+    FFileName := ArchName;
+  end;
+  FFileHandle := FileOpen( FFileName, fmOpenRead or fmShareExclusive );
+
+  pos_stream := 0;
+  for i := 0 to FFiles.Count-1 do begin
+    entry := GetEntry(i);
+    entry^.Handle := FFileHandle;
+    entry^.StreamOffset := pos_stream;
+    entry^.SkipBytesBefore := 0;
+
+    if not aSolid then begin
+      entry^.Info.PackSize := aPackedSizes[i];
+      pos_stream += aPackedSizes[i];
+    end else begin
+      entry^.Info.PackSize := 0;
+    end;
+  end;
+
+  FStreamStartPos := aStreamStartPos;
+  FStreamSize := UPA_CalculateStreamSize();
+  FPackedCount := FFiles.Count;
+end;
+
+function TUniPackArchive.UPA_GetFileAttr( FileName: String ): Byte;
 var
   fpcAttr: LongInt;
 begin
   Result := 0;
   fpcAttr := FileGetAttr( FileName );
-  if eval(fpcAttr and faReadOnly) then Result := Result or upaReadOnly;
-  if eval(fpcAttr and faHidden)   then Result := Result or upaHidden;
-  if eval(fpcAttr and faSysFile)  then Result := Result or upaSystem;
-  if eval(fpcAttr and faArchive)  then Result := Result or upaArchive;
+  if Boolean(fpcAttr and faReadOnly) then Result := Result or upaAReadOnly;
+  if Boolean(fpcAttr and faHidden)   then Result := Result or upaAHidden;
+  if Boolean(fpcAttr and faSysFile)  then Result := Result or upaASystem;
+  if Boolean(fpcAttr and faArchive)  then Result := Result or upaAArchive;
 end;
 
-procedure SetFileAttrUPA( FileName: String; AttrUPA: Byte );
+procedure TUniPackArchive.UPA_SetFileAttr( FileName: String; AttrUPA: Byte );
 var
   fpcAttr: LongInt;
 begin
   fpcAttr := 0;
-  if eval(AttrUPA and upaReadOnly) then fpcAttr := fpcAttr or faReadOnly;
-  if eval(AttrUPA and upaHidden)   then fpcAttr := fpcAttr or faHidden;
-  if eval(AttrUPA and upaSystem)   then fpcAttr := fpcAttr or faSysFile;
-  if eval(AttrUPA and upaArchive)  then fpcAttr := fpcAttr or faArchive;
+  if Boolean(AttrUPA and upaAReadOnly) then fpcAttr := fpcAttr or faReadOnly;
+  if Boolean(AttrUPA and upaAHidden)   then fpcAttr := fpcAttr or faHidden;
+  if Boolean(AttrUPA and upaASystem)   then fpcAttr := fpcAttr or faSysFile;
+  if Boolean(AttrUPA and upaAArchive)  then fpcAttr := fpcAttr or faArchive;
   FileSetAttr( FileName, fpcAttr );
 end;
 
-{ Interfaced common routines ═════════════════════════════════════════════════ }
-
-function OpenUPA( UPAFile: String ): TUniPackArchive;
+function TUniPackArchive.FAT_ReadEntry( ArchHandle: THandle ): TFileInfoUPA;
+  function ReadFName(): String;
+    var
+      len : Byte; //zero-based, meant range is 1..256
+    begin
+      FileRead( ArchHandle, len, 1 );
+      SetLength( Result, len+1 );
+      FileRead( ArchHandle, PChar(Result)^, len+1 );
+    end;
+var
+  fat_entry : TArchEntryUPA;
 begin
-  UPAFile := ExpandFileName( UPAFile );
-  if not FileExists( UPAFile ) then begin
-    UPALastError := UPA_NOFILE;
-    Exit(nil);
-  end;
-
-  Result := TUniPackArchive.Create( UPAFile, True );
-  if ( UPALastError <> UPA_OK ) then begin
-    Result.Destroy();
-    Result := nil
-  end;
+  Result.Name := ReadFName();
+  FileRead( ArchHandle, fat_entry, SizeOf(fat_entry) );
+  Result.Size := fat_entry.FileSize;
+  Result.Attr := fat_entry.FileAttr;
+  Result.Time := fat_entry.FileTime;
+  Result.PackSize := fat_entry.PackSize;
 end;
 
-function StrTimePOSIX( TimePOSIX: LongInt ): String;
+procedure TUniPackArchive.FAT_WriteEntry( ArchHandle: THandle;
+  FileIndex: Integer; NewPackSize: QWord );
+  procedure WriteFName( FileName: String );
+    var
+      len : Byte;
+    begin
+      len := Byte( Length(FileName)-1 );
+      FileWrite( ArchHandle, len, 1 );
+      FileWrite( ArchHandle, PChar(FileName)^, len+1 );
+    end;
+var
+  fat_entry : TArchEntryUPA;
 begin
-  Result := DateTimeToStr( UnixToDateTime( Int64( TimePOSIX ) ) );
+  with GetEntry(FileIndex)^.Info do begin
+    WriteFName( Name );
+    fat_entry.PackSize := NewPackSize;
+    fat_entry.FileSize := Size;
+    fat_entry.FileAttr := Attr;
+    fat_entry.FileTime := LongInt(Time); //TODO: remove typecast
+  end;
+  FileWrite( ArchHandle, fat_entry, SizeOf(fat_entry) );
 end;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
-{ ═ TUniPackArchive ────────────────────────────────────────────────────────── }
 
-constructor TUniPackArchive.Create( UPAFile: String; OpenFile: Boolean );
-var
-  i : Integer;
-  fname : String;
-  Header: THeaderUPA;
-  FATEntry : TEntryFAT;
-  SizePacked : array of SizeUInt;
-  StreamOffset : QWord;
-  //next vars used only for solid archives
-  StreamSize : QWord;
-  StreamBuf : Pointer;
-  UnpackSize : QWord;
-  UnpackBuf : Pointer;
+procedure TUniPackArchive.Init();
 begin
+  FFileName := EmptyStr;
+  FFileHandle := UnusedHandle;
+  FStreamStartPos := 0;
+  FStreamSize := 0;
+  FPackedCount := 0;
+  FAllFilesSize := 0;
+  FSolid := False;
+  FMethod := nil;
+end;
+
+constructor TUniPackArchive.Create();
+begin
+  FPackBufSize := upaPackBufStd;
+  FOutputBufSize := upaOutputBufStd;
   FFiles := TList.Create();
-  FFileName := UPAFile;
-
-  if not OpenFile then begin
-    FHandle := UnusedHandle;
-    FMethod := nil;
-    FSolid := False;
-    UPALastError := UPA_OK;
-    Exit;
-  end;
-
-  FHandle := FileOpen( UPAFile, fmOpenRead or fmShareExclusive );
-  FileRead( FHandle, Header, SizeOf(THeaderUPA) );
-
-  if ( Header.Sign <> UPA_SIGN ) then begin
-    UPALastError := UPA_BADSIGN;
-    Exit;
-  end;
-
-  FMethod := GetMethod( Header.Method );
-  if ( FMethod = nil ) then begin
-    UPALastError := UPA_NOMETHOD;
-    Exit;
-  end;
-
-  FSolid := Header.isSolid;
-  SetLength( SizePacked, Header.FileNum );
-
-  //reading FAT
-  UnpackSize := 0;
-  for i := 1 to Header.FileNum do begin
-    fname := read_fatfname( FHandle );
-    FileRead( FHandle, FATEntry, SizeOf(TEntryFAT) );
-    AddEntry( fname, FATEntry.FileSize, FATEntry.FileAttr, FATEntry.FileTime );
-    SizePacked[i-1] := FATEntry.PackSize;
-    UnpackSize += FATEntry.FileSize;
-  end;
-
-  //unpacking data
-  StreamOffset := FileSeek( FHandle, 0, fsFromCurrent );
-  if not FSolid then begin
-    //if archive isn't solid, we just store data locations
-    for i := 0 to Header.FileNum-1 do begin
-      SetEntryData( i, True, SizePacked[i], FHandle, StreamOffset );
-      StreamOffset += SizePacked[i];
-    end;
-  end else begin
-    //otherwise we unpack all the data
-    StreamSize := GetFileSize( FHandle ) - StreamOffset;
-    StreamBuf := GetMemory( StreamSize );
-    if ( StreamBuf = nil ) then begin
-      UPALastError := UPA_NOMEMORY;
-      Exit;
-    end;
-
-    FileRead( FHandle, StreamBuf^, StreamSize );
-    UnpackBuf := FMethod.Decompress( StreamBuf, StreamSize, UnpackSize );
-    FreeMemory( StreamBuf ); //we don't need packed stream anymore
-    if ( UnpackBuf = nil ) then begin
-      UPALastError := UPA_LIBERROR;
-      Exit;
-    end;
-
-    //our strategy is next: we take last file in unpacked stream, store it
-    //in separate buffer and then perform reallocation of unpacked stream to
-    //truncate data of processed file. and repeat this till stream end.
-    //thereby, we will not waste much of memory only for copies.
-
-    // i don't want to create tons of variables, sorry
-    StreamBuf := UnpackBuf;
-    StreamSize := UnpackSize;
-
-    for i := Header.FileNum downto 1 do begin
-      UnpackSize := PFileEntry( FFiles[i-1] )^.FileSize;
-      UnpackBuf := GetMemory( UnpackSize );
-      StreamSize -= UnpackSize;
-      Move( (StreamBuf+StreamSize)^, UnpackBuf^, UnpackSize );
-      StreamBuf := FMethod.ReallocMem( StreamBuf, StreamSize );
-      SetEntryData( i, False, UnpackSize, False, UnpackBuf );
-    end;
-    FMethod.FreeMem( StreamBuf );
-  end;
-
-  UPALastError := UPA_OK;
-  SetLength( SizePacked, 0 );
+  Init();
 end;
 
 destructor TUniPackArchive.Destroy();
 begin
-  Clear();
+  Close();
+  FFiles.Destroy();
   inherited Destroy();
 end;
 
-procedure TUniPackArchive.DestroySave();
+{ –=────────────────────────────────────────────────────────────────────────=– }
+
+function TUniPackArchive.Open( FileName: String ): TErrorUPA;
 var
-  UPAFile : String;
+  EntryInfo : TFileInfoUPA;
+  ArchFile : THandle;
+  header_check : TErrorUPA;
+  pos_stream : QWord;
   i : Integer;
-  outFile : THandle;
-  Header : THeaderUPA;
-  Entry : TEntryFAT;
-  StreamOffset : QWord;
 begin
-  //TODO: Write saving of solid archives
-  if FSolid then
-    raise Exception.Create('Solid archives not supported yet, sorry.');
-  
-  UPAFile := FFileName;
-  if ( FHandle <> UnusedHandle ) then UPAFile := ChangeFileExt( UPAFile, '.tmp' );
-  UPAFile := UniqueFileName( ExpandFileName( UPAFile ) );
+  FileName := ExpandFileName( FileName );
+  if not FileExists( FileName ) then
+    Exit( eupFileNotFound );
 
-  outFile := FileCreate( UPAFile, fmShareExclusive );
+  ArchFile := FileOpen( FileName, fmOpenRead or fmShareExclusive );
+  if ArchFile = UnusedHandle then
+    Exit( eupFileError );
 
-  Header.Sign := UPA_SIGN;
-  Header.Method := FMethod.Name;
-  Header.isSolid := FSolid;
-  Header.FileNum := FFiles.Count;
-  FileWrite( outFile, Header, SizeOf(THeaderUPA) );
+  header_check := UPA_ReadAndCheckHeader( ArchFile );
+  if header_check <> eupOK then begin
+    FileClose( ArchFile );
+    Exit( header_check );
+  end;
 
-  //calculating data stream offset in archive file
-  StreamOffset := SizeOf(THeaderUPA) + FFiles.Count * SizeOf(TEntryFAT);
-  for i := 0 to FFiles.Count-1 do // +1 is for string length descriptor
-    StreamOffset += Length( PFileEntry( FFiles[i] )^.FileName ) + 1;
-  
-  //packing files and writing its data and FAT entries
-  for i := 0 to FFiles.Count-1 do begin
-    with PFileEntry( FFiles[i] )^ do begin
-      FileToMemory(i); //because file could be stored packed in archive
-      if not FSolid then begin
-        //if archive isn't solid, just writing packed files data
-        PackData(i);
-        MemoryToFile( i, outFile, StreamOffset );
-        StreamOffset += DataSize;
-        Entry.PackSize := DataSize;
-      end {else begin
-        UnpackData(i);
-        Entry.PackSize := 0;
-      end};
-      Entry.FileSize := FileSize;
-      Entry.FileAttr := FileAttr;
-      Entry.FileTime := FileTime;
-      write_fatfname( outFile, FileName );
+  pos_stream := 0;
+  FAllFilesSize := 0;
+
+  for i := 1 to FPackedCount do begin
+    EntryInfo := FAT_ReadEntry( ArchFile );
+    AddEntry( EntryInfo, ArchFile, pos_stream );
+    if not FSolid then pos_stream += EntryInfo.PackSize;
+    FAllFilesSize += EntryInfo.Size;
+  end;
+
+  FFileName := FileName;
+  FFileHandle := ArchFile;
+  FStreamStartPos := GetFilePos( ArchFile );
+  FStreamSize := UPA_CalculateStreamSize();
+
+  Result := eupOK;
+end;
+
+function TUniPackArchive.Save( NewFileName: String; aMethod: TUniPackMethod;
+  aSolid: Boolean; RemapToNew: Boolean ): TErrorUPA;
+var
+  ArchFile : THandle;
+  PackedBuf : Pointer;
+  PackedSize, ChunkDataLeft, write_size : SizeUInt;
+  BytesOut, PackUpSize : QWord;
+  i, upd_file : Integer;
+  TempFile : Boolean;
+  NewStreamStartPos : QWord;
+  NewPackedSizes : array of QWord;
+begin
+  if not aMethod.CanPack then
+    Exit( eupMethodNotImplemented );
+
+  TempFile := UPA_GetSaveArchName( NewFileName );
+  if NewFileName = EmptyStr then
+    Exit( eupFileError );
+  if TempFile then RemapToNew := True;
+
+  ArchFile := FileCreate( NewFileName );
+  NewStreamStartPos := UPA_CalculateStreamPos();
+  SetFilePos( ArchFile, NewStreamStartPos );
+
+  PipelineInit();
+  PackedBuf := GetMem( FPackBufSize );
+  if aSolid then begin
+    PackUpSize := FAllFilesSize;
+    aMethod.InitPack( PackUpSize );
+  end else begin
+    PackUpSize := 0; //shut up the compiler
+  end;
+
+  upd_file := FDplCurrentFile;
+  if not aSolid then
+    SetLength( NewPackedSizes, FFiles.Count )
+  else
+    SetLength( NewPackedSizes, 1 );
+
+  //packing and writing data
+  BytesOut := 0;
+  ChunkDataLeft := 0;
+  while (FDplCurrentFile < FFiles.Count) or (ChunkDataLeft > 0) do begin
+
+    if ChunkDataLeft = 0 then begin
+      if not aSolid and (BytesOut = 0) then begin
+        PackUpSize := GetEntry(FDplCurrentFile)^.Info.Size;
+        aMethod.InitPack( PackUpSize );
+      end;
+
+      //read data to be packed, from pipeline
+      repeat
+        //TODO: handle pipeline error here
+        ChunkDataLeft += PipelineGetData( ChunkDataLeft );
+      until (
+        not aSolid //if non-solid, read data only once
+        or (ChunkDataLeft = FOutputBufSize) //FDplDataOutBuf is full
+        or (FDplCurrentFile = FFiles.Count) //data ended in pipeline
+      );
+      aMethod.PackSetChunk( FDplDataOutBuf, ChunkDataLeft );
+      BytesOut += ChunkDataLeft;
     end;
-    FileWrite( outFile, Entry, SizeOf(TEntryFAT) );
+
+    PackedSize := aMethod.PackStep( PackedBuf, FPackBufSize, ChunkDataLeft );
+    if PackedSize = 0 then begin
+      FileClose( ArchFile );
+      SysUtils.DeleteFile( NewFileName );
+      PipelineFree();
+      aMethod.EndPack();
+      Exit( eupMethodError );
+    end;
+
+    write_size := FileWrite( ArchFile, PackedBuf^, PackedSize );
+    //TODO: handle file error here
+
+    NewPackedSizes[upd_file] += PackedSize;
+
+    if not aSolid and (BytesOut = PackUpSize) and (ChunkDataLeft = 0) then begin
+      //another one bites the dust
+      aMethod.EndPack();
+      BytesOut := 0;
+      //TODO: assert( ChunkDataLeft > 0 ) ?
+      upd_file += 1;
+    end;
+
   end;
 
-  FileClose( outFile );
-  if ( FHandle <> UnusedHandle ) then begin
-    FileClose( FHandle );
-    DeleteFile( FFileName );
-    RenameFile( UPAFile, FFileName );
+  SetFilePos( ArchFile, 0 );
+  UPA_WriteHeader( ArchFile, aMethod, aSolid );
+  for i := 0 to FFiles.Count-1 do begin
+    if not aSolid then
+      PackedSize := NewPackedSizes[i]
+    else
+      PackedSize := 0;
+    FAT_WriteEntry( ArchFile, i, PackedSize );
   end;
 
-  FHandle := outFile; //to prevent freeing handles by CloseHandle() in Clear()
-  Destroy();
+  FileClose( ArchFile );
+  if aSolid then aMethod.EndPack();
+  PipelineFree();
+  FreeMem( PackedBuf );
+
+  if RemapToNew then
+    UPA_RemapArchive( NewFileName, TempFile, aMethod, aSolid,
+      NewStreamStartPos, NewPackedSizes );
+
+  Result := eupOK;
+end;
+
+procedure TUniPackArchive.Close();
+begin
+  while FFiles.Count > 0 do
+    DeleteFile( FFiles.Count-1 );
+  FileClose( FFileHandle );
+  Init();
 end;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
 
 function TUniPackArchive.AddFile( FileName: String ): Boolean;
 var
-  ind : Integer;
-  size : SizeUInt;
   hfile : THandle;
+  info : TFileInfoUPA;
+  index : Integer;
 begin
-  if ( FFiles.Count = UPA_MAXFILES ) then Exit( False );
+  if FFiles.Count = upaMaxFiles then Exit( False );
   if not FileExists( FileName ) then Exit( False );
 
+  info.Attr := UPA_GetFileAttr( FileName );
+  info.Time := GetFileTimePOSIX( FileName );
+
   hfile := FileOpen( FileName, fmOpenRead or fmShareDenyWrite );
-  size := GetFileSize( hfile );
+  if hfile = UnusedHandle then Exit( False );
 
-  ind := AddEntry( ExtractFileName( FileName ), size,
-                   GetFileAttrUPA( FileName ), GetFileTimePOSIX( hfile ) );
-  SetEntryData( ind, False, size, hfile, 0 ); // DS_FILE
-end;
+  info.Name := ExtractFileName( FileName );
+  info.Size := GetFileSize( hfile );
+  info.PackSize := 0;
 
-procedure TUniPackArchive.WriteFile( Index: Integer; ADir: String = '' );
-var
-  hfile: THandle;
-  DumpHandle: THandle;
-  DumpOffset: SizeUInt;
-  FileBuf: Pointer;
-begin
-  // if file data is currently stored on disk, we will transfer it to memory
-  // without changing actual data location storage
-  // we don't use UnpackData() because then current file data will be discarded
-  with PFileEntry( FFiles[Index] )^ do begin
-    if ( Storage = DS_FILE ) then begin
-      DumpHandle := FileHandle;
-      DumpOffset := DataOffset;
-      FileToMemory( Index, False );
-    end else
-      DumpHandle := UnusedHandle;
-
-    //if data is packed, we unpacking it manually
-    if isPacked then begin
-      FileBuf := FMethod.Decompress( MemoryPtr, DataSize, FileSize )
-    end else
-      FileBuf := MemoryPtr;
-
-    ADir := IncludeTrailingPathDelimiter(ADir) + FileName;
-    hfile := FileCreate( ADir, fmShareExclusive );
-    FileWrite( hfile, FileBuf^, FileSize );
-    SetFileTimePOSIX( hfile, FileTime );
+  index := AddEntry( info, hfile, 0 );
+  Result := index <> upaInvalidIndex;
+  if Result then
+    FAllFilesSize += info.Size
+  else
     FileClose( hfile );
-    SetFileAttrUPA( ADir, FileAttr );
-
-    //freeing and restoring everything
-    if isPacked then FMethod.FreeMem( FileBuf );
-    if ( DumpHandle <> UnusedHandle ) then begin
-      FreeBuffer( Index );
-      SetEntryData( Index, isPacked, DataSize, DumpHandle, DumpOffset );
-    end;
-  end;
 end;
 
-procedure TUniPackArchive.Clear();
+procedure TUniPackArchive.DeleteFile( Index: Integer );
 var
-  i : Integer;
+  entry, next : PFileEntryUPA;
 begin
-  for i := 0 to FFiles.Count-1 do begin
-    FreeBuffer(i);
-    CloseHandle(i);
-    Dispose( PFileEntry( FFiles[i] ) );
+  entry := GetEntry( Index );
+
+  CloseHandle( entry^.Handle );
+  FAllFilesSize -= entry^.Info.Size;
+  if index < FPackedCount then begin
+    if (index < FPackedCount-1) and FSolid then begin
+      next := GetEntry( Index+1 );
+      next^.SkipBytesBefore += entry^.SkipBytesBefore + entry^.Info.Size;
+    end;
+    FPackedCount -= 1;
   end;
-  FFiles.Clear();
+
+  FFiles.Delete( Index );
+  Dispose( entry );
+end;
+
+function TUniPackArchive.Count(): Integer;
+begin
+  Result := FFiles.Count;
+end;
+
+function TUniPackArchive.FileInfo( Index: Integer ): TFileInfoUPA;
+begin
+  Result := GetEntry(Index)^.Info;
+end;
+
+//note: Files.Sorted must be True
+function TUniPackArchive.WriteFiles( DirPath: String; FileIndexes: TIntList ): TErrorUPA;
+var
+  CurrentFile, FileCount, fnum : Integer;
+  BytesRead : SizeUInt;
+  BytesWrite : QWord;
+  filetime : Int64;
+  hfile : THandle;
+  entry : PFileEntryUPA;
+  fname : String;
+begin
+  if not FMethod.CanUnpack and (FPackedCount > 0) then
+    Exit( eupMethodNotImplemented );
+
+  if FileIndexes <> nil then begin
+    if not FileIndexes.Sorted then
+      Exit( eupInvalidInput );
+    FileCount := FileIndexes.Count;
+  end else begin
+    FileCount := FFiles.Count;
+  end;
+
+  DirPath := IncludeTrailingPathDelimiter( DirPath );
+  if not DirectoryExists( DirPath ) then CreateDir( DirPath );
+
+  CurrentFile := -1;
+  fnum := 0;
+  PipelineInit();
+
+  while FileCount > 0 do begin
+
+    if FileIndexes = nil then begin
+      CurrentFile += 1
+    end else begin
+      CurrentFile := FileIndexes.Integers[fnum];
+      fnum += 1;
+      PipelineSetNext( CurrentFile );
+    end;
+
+    entry := GetEntry( CurrentFile );
+    fname := DirPath + entry^.Info.Name;
+    hfile := FileCreate( fname );
+
+    BytesWrite := 0;
+    while BytesWrite < entry^.Info.Size do begin
+      BytesRead := PipelineGetData(0);
+      if BytesRead = 0 then begin
+        FileClose( hfile );
+        PipelineFree();
+        Exit( eupFileError );
+      end;
+      FileWrite( hfile, FDplDataOutBuf^, BytesRead );
+      BytesWrite += BytesRead;
+    end;
+
+    FileClose( hfile );
+    filetime := entry^.Info.Time;
+    if filetime <> -1 then SetFileTimePOSIX( fname, filetime );
+    UPA_SetFileAttr( fname, entry^.Info.Attr );
+    FileCount -= 1;
+
+  end;
+
+  PipelineFree();
+  Result := eupOK;
 end;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
 
-function TUniPackArchive.PackData( Index: Integer ): Boolean;
+function TUniPackArchive.AddEntry( const aInfo: TFileInfoUPA; aHandle: THandle;
+  aOffsetStream: QWord ): Integer;
 var
-  newbuf : Pointer;
-begin
-  if ( FMethod = nil ) then Exit( False );
-  if ( FMethod.Compress = nil ) then Exit( False );
-
-  with PFileEntry( FFiles[Index] )^ do begin
-    if isPacked then Exit( False );
-    FileToMemory(Index);
-    newbuf := FMethod.Compress( MemoryPtr, DataSize );
-    if ( newbuf = nil ) then begin
-      UPALastError := UPA_LIBERROR;
-      Exit;
-    end;
-    FreeBuffer(Index);
-  end;
-  SetEntryData( Index, True, FMethod.CompSize(), True, newbuf ); // DS_LIBMEM
-  Result := True;
-end;
-
-function TUniPackArchive.UnpackData( Index: Integer ): Boolean;
-var
-  newbuf : Pointer;
-begin
-  if ( FMethod = nil ) then Exit( False );
-  if ( FMethod.Decompress = nil ) then Exit( False );
-
-  with PFileEntry( FFiles[Index] )^ do begin
-    if not isPacked then Exit( False );
-    FileToMemory(Index);
-    newbuf := FMethod.Decompress( MemoryPtr, DataSize, FileSize );
-    if ( newbuf = nil ) then begin
-      UPALastError := UPA_LIBERROR;
-      Exit;
-    end;
-    FreeBuffer(Index);
-    SetEntryData( Index, False, FileSize, True, newbuf ); // DS_LIBMEM
-  end;
-  Result := True;
-end;
-
-procedure TUniPackArchive.SetMethod( AMethod: TUniMethod );
-var
-  i : Integer;
-begin
-  if ( AMethod = FMethod ) then Exit;
-  for i := 0 to FFiles.Count-1 do UnpackData(i);
-  FMethod := AMethod;
-end;
-
-{ TUniPackArchive - Internal Routines ════════════════════════════════════════ }
-
-function TUniPackArchive.AddEntry( AName: String; ASize: SizeUInt; AAttr: Byte;
-  ATime: LongInt ): Integer;
-var
-  entry : PFileEntry;
+  entry : PFileEntryUPA;
 begin
   New( entry );
-  if not Assigned( entry ) then Exit(-1);
+  if entry = nil then Exit( upaInvalidIndex );
+
+  with entry^ do begin
+    Info := aInfo;
+    Handle := aHandle;
+    StreamOffset := aOffsetStream;
+    SkipBytesBefore := 0;
+  end;
 
   Result := FFiles.Add( entry );
-  with PFileEntry( entry )^ do begin
-    FileName := AName; FileSize := ASize;
-    FileAttr := AAttr; FileTime := ATime;
-    Storage := DS_NODATA;
-  end;
 end;
 
-procedure TUniPackArchive.SetEntryData( Index: Integer; APacked: Boolean;
-  ASize: SizeUInt; ALibMem: Boolean; AMemory: Pointer ); overload;
+function TUniPackArchive.GetEntry( Index: Integer ): PFileEntryUPA;
 begin
-  with PFileEntry( FFiles[Index] )^ do begin
-    isPacked := APacked;
-    DataSize := ASize;
-
-    if ALibMem then Storage := DS_LIBMEM
-               else Storage := DS_APPMEM;
-    MemoryPtr := AMemory;
-  end;
+  Result := PFileEntryUPA( FFiles[Index] );
 end;
 
-procedure TUniPackArchive.SetEntryData( Index: Integer; APacked: Boolean;
-  ASize: SizeUInt; AHandle: THandle; AOffset: SizeUInt ); overload;
+procedure TUniPackArchive.CloseHandle( Handle: THandle );
 begin
-  with PFileEntry( FFiles[Index] )^ do begin
-    isPacked := APacked;
-    DataSize := ASize;
+  if Handle <> FFileHandle then
+    FileClose( Handle );
+end;
 
-    Storage := DS_FILE;
-    FileHandle := AHandle;
-    DataOffset := AOffset;
-  end;
+//returns FFiles.Count if StartIndex'ed file and all subsequent are empty
+function TUniPackArchive.FindFirstNotEmptyFile( StartIndex: Integer ): Integer;
+begin
+  repeat
+    Result := StartIndex;
+    if Result = FFiles.Count then
+      Exit;
+    StartIndex += 1;
+  until GetEntry(Result)^.Info.Size > 0;
 end;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
 
-procedure TUniPackArchive.CloseHandle( Index: Integer );
-begin
-  with PFileEntry( FFiles[Index] )^ do begin
-    if ( Storage <> DS_FILE ) then Exit;
-    if ( FileHandle <> FHandle ) then begin
-      FileClose( FileHandle );
-      FileHandle := UnusedHandle;
-      DataOffset := 0;
-    end;
-  end;
-end;
+{
+  Data pipeline intended to get plain data from packed/non-packed data stream.
+  How pipeline works:
+  Firsly, let's assume an important invariant: packed files (files
+  from archive) always go first in FFiles list. This is guaranteed
+  by adding file records to empty list when opening archive.
+  In general, we have an abstract data stream that looks like this:
+    packed1#packed2#...#packedN#newfile1#newfile2#...newfileM
+  where N is FPackedCount and M is (FFiles.Count-FPackedCount).
+  So, if we start from packed file 3, then we skip first two files
+  (even if archive is solid, obviously) and begin to unpack data.
+  Note that files must be enumerated ascendingly when accessing.
+  For solid archives: if packed file that was between two packed too, was
+  removed, it's data will be skipped automatically (see FDplSkippedBefore and
+  TFileEntryUPA.SkipBytesBefore).
+}
 
-procedure TUniPackArchive.FreeBuffer( Index: Integer );
-begin
-  with PFileEntry( FFiles[Index] )^ do begin
-    case Storage of
-      DS_APPMEM: FreeMemory( MemoryPtr );
-      DS_LIBMEM: FMethod.FreeMem( MemoryPtr );
-      else Exit;
-    end;
-    MemoryPtr := nil;
-  end;
-end;
-
-{ –=────────────────────────────────────────────────────────────────────────=– }
-
-procedure TUniPackArchive.FileToMemory( Index: Integer; AClose: Boolean = True );
+procedure TUniPackArchive.PipelineInit();
 var
-  tempbuf : Pointer;
-  oldoffs : Int64;
+  entry : PFileEntryUPA;
+  packed_size : QWord;
 begin
-  with PFileEntry( FFiles[Index] )^ do begin
-    if ( Storage <> DS_FILE ) then Exit;
-    tempbuf := GetMemory( DataSize );
-    oldoffs := FileSeek( FileHandle, 0, fsFromCurrent );
-    FileSeek( FileHandle, DataOffset, fsFromBeginning );
-    FileRead( FileHandle, tempbuf^, DataSize );
-    FileSeek( FileHandle, oldoffs, fsFromBeginning );
-  end;
-  if AClose then CloseHandle(Index);
-  with PFileEntry( FFiles[Index] )^ do begin
-    Storage := DS_APPMEM;
-    MemoryPtr := tempbuf;
+  FDplCurrentFile := FindFirstNotEmptyFile(0);
+  if FDplCurrentFile = FFiles.Count then
+    Exit;
+  entry := GetEntry( FDplCurrentFile );
+
+  PipelineResetState( True );
+  FDplDataOutBuf := GetMem( FOutputBufSize );
+
+  //if there are packed files, init decompressor context
+  if FPackedCount > 0 then begin
+    FDplPackedBuf := GetMem( FPackBufSize );
+    SetFilePos( FFileHandle, FStreamStartPos );
+    if FSolid then
+      packed_size := FStreamSize
+    else
+      packed_size := entry^.Info.PackSize;
+    FMethod.InitUnpack( packed_size );
+
+  end else begin
+    FDplPackedBuf := nil;
   end;
 end;
 
-procedure TUniPackArchive.MemoryToFile( Index: Integer; Handle: THandle;
-  Offset: SizeUInt );
+procedure TUniPackArchive.PipelineResetState( Forced: Boolean );
+begin
+  FDplFileBytesDone := 0;
+  FDplSkippedBefore := 0; //needed only on solid stream
+  if not FSolid or Forced then begin
+    FDplPackedDataPos := 0;
+    FDplChunkDataLeft := 0;
+  end;
+end;
+
+procedure TUniPackArchive.PipelineEndUnpack();
+begin
+  if FDplPackedBuf <> nil then begin
+    FMethod.EndUnpack();
+    FreeMem( FDplPackedBuf );
+    FDplPackedBuf := nil;
+  end;
+end;
+
+procedure TUniPackArchive.PipelineFree();
+begin
+  PipelineEndUnpack();
+  FreeMem( FDplDataOutBuf );
+end;
+
+//note: next file index must be always larger than current
+function TUniPackArchive.PipelineSetNext( FileIndex: Integer;
+  SkipEmpty: Boolean ): Boolean;
 var
-  oldoffs : Int64;
+  entry : PFileEntryUPA;
+  seek_file : THandle;
+  seek_pos : QWord;
+  not_empty : Integer;
 begin
-  with PFileEntry( FFiles[Index] )^ do begin
-    if not ( Storage in [DS_APPMEM, DS_LIBMEM] ) then Exit;
-    oldoffs := FileSeek( Handle, 0, fsFromCurrent );
-    FileSeek( Handle, Offset, fsFromBeginning );
-    FileWrite( Handle, MemoryPtr^, DataSize );
-    FileSeek( Handle, oldoffs, fsFromBeginning );
+  if FileIndex <= FDplCurrentFile then
+    Exit( False );
+  not_empty := FindFirstNotEmptyFile( FileIndex );
+  if not_empty > FileIndex then begin
+    if SkipEmpty then
+      FileIndex := not_empty
+    else
+      Exit( False );
   end;
-  FreeBuffer(Index);
-  with PFileEntry( FFiles[Index] )^ do begin
-    Storage := DS_FILE;
-    FileHandle := Handle;
-    DataOffset := Offset;
+
+  if FileIndex = FFiles.Count then begin
+    FDplCurrentFile := FileIndex;
+    PipelineResetState();
+    PipelineEndUnpack();
+    Exit( True );
   end;
+
+  if not FSolid then begin
+    FDplCurrentFile := FileIndex;
+    PipelineResetState();
+    entry := GetEntry( FileIndex );
+    if FileIndex < FPackedCount then begin
+      seek_file := FFileHandle;
+      seek_pos := FStreamStartPos + entry^.StreamOffset;
+      FMethod.EndUnpack();
+      FMethod.InitUnpack( entry^.Info.PackSize );
+    end else begin
+      seek_file := entry^.Handle;
+      seek_pos := 0;
+      PipelineEndUnpack(); //we don't need decompressor context anymore
+    end;
+    SetFilePos( seek_file, seek_pos );
+
+  end else begin
+    //if packed data is solid, successively unpack files that are between
+    //old and new index to skip them (we don't use unpacked data here)
+    //note: empty files between old and new indexes will be successfully
+    //skipped because FDplFileBytesDone will equal to 0
+    repeat
+      entry := GetEntry( FDplCurrentFile );
+      if entry^.Info.Size = FDplFileBytesDone then begin        
+        FDplCurrentFile += 1;
+        PipelineResetState();
+      end else begin
+        PipelineGetData(0);
+      end;
+    until FDplCurrentFile = FileIndex;
+  end;
+
+  Result := True;
 end;
 
-{ TUniPackArchive - Property Routines ════════════════════════════════════════ }
-
-//TODO: Check if entry could be corrupt here
-function TUniPackArchive.GetEntry( Index: Integer ): TFileEntry;
+//returns 0 on error, count of read bytes otherwise
+function TUniPackArchive.PipelineGetData( OutBufOffset: SizeUInt ): SizeUInt;
+var
+  entry : PFileEntryUPA;
+  out_size, chunk_size, fread_size : SizeUInt;
+  left_size, packed_size, skip_size : QWord;
+  out_buf, void_buf : Pointer; //for skipping data
 begin
-  Result := PFileEntry( FFiles[Index] )^; //it is copy!
-  Result.Storage := DS_NODATA; //zero data fields for safety
+  Result := 0;
+  if FDplCurrentFile = FFiles.Count then
+    Exit;
+  entry := GetEntry( FDplCurrentFile );
+
+  out_size := FOutputBufSize - OutBufOffset;
+  left_size := entry^.Info.Size - FDplFileBytesDone;
+  if out_size > left_size then out_size := left_size;
+  out_buf := FDplDataOutBuf + OutBufOffset;
+
+  if FDplCurrentFile < FPackedCount then begin
+    //if OutBufOffset > 0 then user may need data in FDplDataOutBuf before
+    //this offset, so we allocate another buffer to skip data
+    if OutBufOffset > 0 then
+      void_buf := GetMem( FOutputBufSize )
+    else
+      void_buf := FDplDataOutBuf;
+
+    repeat
+      //feeding new packed data chunk, if needed
+      if FDplChunkDataLeft = 0 then begin
+        if FSolid then
+          packed_size := FStreamSize
+        else
+          packed_size := entry^.Info.PackSize;
+        chunk_size := packed_size - FDplPackedDataPos;
+        if chunk_size > FPackBufSize then chunk_size := FPackBufSize;
+        fread_size := FileRead( FFileHandle, FDplPackedBuf^, chunk_size );
+        if fread_size <> chunk_size then
+          Exit;
+        FMethod.UnpackSetChunk( FDplPackedBuf, chunk_size );
+        FDplPackedDataPos += chunk_size;
+        FDplChunkDataLeft := chunk_size;
+      end;
+
+      //performing decompression step
+      if (FDplSkippedBefore = entry^.SkipBytesBefore) or not FSolid then begin
+        Result := FMethod.UnpackStep( out_buf, out_size, FDplChunkDataLeft );
+      end else begin //if less
+        skip_size := entry^.SkipBytesBefore - FDplSkippedBefore;
+        if skip_size > FOutputBufSize then out_size := FOutputBufSize;
+        skip_size := FMethod.UnpackStep( void_buf, skip_size, FDplChunkDataLeft );
+        FDplSkippedBefore += skip_size;
+      end;
+    until FDplSkippedBefore = entry^.SkipBytesBefore;
+
+    if void_buf <> FDplDataOutBuf then
+      FreeMem( void_buf );
+
+  end else begin
+    //if we are on non-packed files now, simply read bytes
+    fread_size := FileRead( entry^.Handle, out_buf^, out_size );
+    if fread_size <> out_size then
+      Exit;
+    Result := out_size;
+  end;
+
+  FDplFileBytesDone += Result;
+  if FDplFileBytesDone = entry^.Info.Size then
+    PipelineSetNext( FDplCurrentFile+1, True );
 end;
-
-function TUniPackArchive.GetCount: Integer;
-   begin Result := FFiles.Count;
-     end;
-
-function TUniPackArchive.GetMethodName: TUniMethodName;
-   begin Result := FMethod.Name;
-     end;
 
 end.
 
