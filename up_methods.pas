@@ -114,7 +114,7 @@ begin
     Result := Get( method.FName ) = nil;
 
   if Result then begin
-    method.FIndex := upMethods.Add( method )
+    method.FIndex := upMethods.Add( method );
   end else begin
     method.FIndex := UP_NO_INDEX;
     method.Destroy();
@@ -146,6 +146,7 @@ begin
   while (Result = nil) and (i < upMethods.Count) do begin
     Result := TUniPackMethod( upMethods[i] );
     if Result.Name <> AName then Result := nil;
+    i += 1;
   end;
 end;
 
@@ -221,11 +222,9 @@ end;
 { –=────────────────────────────────────────────────────────────────────────=– }
 
 procedure upUnloadAllMethods();
-var
-  i : Integer;
 begin
-  for i := 0 to upMethods.Count-1 do
-    TUniPackMethod( upMethods[i] ).Destroy();
+  while upMethods.Count > 0 do
+    TUniPackMethod.Get( upMethods.Count-1 ).Destroy();
 end;
 
 initialization
