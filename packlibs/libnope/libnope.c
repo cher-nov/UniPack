@@ -7,9 +7,9 @@
 #include "libnope.h"
 
 static int lib_error = UP_OK;
-static void* lib_pack_chunk;
+static char* lib_pack_chunk;
 static size_t lib_pack_size;
-static void* lib_unpack_chunk;
+static char* lib_unpack_chunk;
 static size_t lib_unpack_size;
 
 /* plugin info functions */
