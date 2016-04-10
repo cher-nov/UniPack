@@ -398,7 +398,7 @@ var
   PackedBuf : Pointer;
   PackedSize, ChunkDataLeft, write_size : SizeUInt;
   BytesOut, PackUpSize : QWord;
-  i, upd_file : Integer;
+  i, PackingFile : Integer;
   TempFile : Boolean;
   NewStreamStartPos : QWord;
   NewPackedSizes : array of QWord;
@@ -414,21 +414,18 @@ begin
   ArchFile := FileCreate( NewFileName );
   NewStreamStartPos := UPA_CalculateStreamPos();
   SetFilePos( ArchFile, NewStreamStartPos );
-
   PipelineInit();
   PackedBuf := GetMem( FPackBufSize );
+
+  PackingFile := 0;
   if aSolid then begin
+    SetLength( NewPackedSizes, 1 );
     PackUpSize := FAllFilesSize;
     aMethod.InitPack( PackUpSize );
   end else begin
-    PackUpSize := 0; //shut up the compiler
+    SetLength( NewPackedSizes, FFiles.Count );
+    PackUpSize := 0;
   end;
-
-  upd_file := FDplCurrentFile;
-  if not aSolid then
-    SetLength( NewPackedSizes, FFiles.Count )
-  else
-    SetLength( NewPackedSizes, 1 );
 
   //packing and writing data
   BytesOut := 0;
@@ -437,7 +434,8 @@ begin
 
     if ChunkDataLeft = 0 then begin
       if not aSolid and (BytesOut = 0) then begin
-        PackUpSize := GetEntry(FDplCurrentFile)^.Info.Size;
+        PackingFile := FDplCurrentFile;
+        PackUpSize := GetEntry(PackingFile)^.Info.Size;
         aMethod.InitPack( PackUpSize );
       end;
 
@@ -446,7 +444,7 @@ begin
         //TODO: handle pipeline error here
         ChunkDataLeft += PipelineGetData( ChunkDataLeft );
       until (
-        not aSolid //if non-solid, read data only once
+        not aSolid //if non-solid, read file data only once
         or (ChunkDataLeft = FOutputBufSize) //FDplDataOutBuf is full
         or (FDplCurrentFile = FFiles.Count) //data ended in pipeline
       );
@@ -466,13 +464,12 @@ begin
     write_size := FileWrite( ArchFile, PackedBuf^, PackedSize );
     //TODO: handle file error here
 
-    NewPackedSizes[upd_file] += PackedSize;
+    NewPackedSizes[PackingFile] += PackedSize;
 
     if not aSolid and (BytesOut = PackUpSize) and (ChunkDataLeft = 0) then begin
       //another one bites the dust
       aMethod.EndPack();
       BytesOut := 0;
-      upd_file += 1;
     end;
 
   end;
