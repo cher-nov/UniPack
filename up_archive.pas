@@ -420,7 +420,8 @@ begin
   upd_pos := 0;
   if aSolid then begin
     SetLength( NewPackedSizes, 1 );
-    aMethod.InitPack( FAllFilesSize );
+    if FAllFilesSize > 0 then
+      aMethod.InitPack( FAllFilesSize );
   end else begin
     SetLength( NewPackedSizes, FFiles.Count );
   end;
