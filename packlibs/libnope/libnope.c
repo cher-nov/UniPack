@@ -94,9 +94,7 @@ bool up_pack_done() {
   return (lib_pack_left == 0);
 }
 
-void up_pack_end() {
-  up_pack_init(0);
-}
+void up_pack_end() {}
 
 /* decompression functions */
 
@@ -139,8 +137,6 @@ bool up_unpack_done() {
   return (lib_unpack_left == 0);
 }
 
-void up_unpack_end() {
-  up_unpack_init(0);
-}
+void up_unpack_end() {}
 
 
