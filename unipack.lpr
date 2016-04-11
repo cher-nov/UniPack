@@ -193,7 +193,7 @@ begin
       with TUniPackMethod.Get(i) do begin
         if CanPack   then pack   := '+' else pack   := '-';
         if CanUnpack then unpack := '+' else unpack := '-';
-        WriteLn( Format( '%0:6s | %1:7x | %2:4s | %3:6s | %4:7s',
+        WriteLn( Format( '%6s | %7.4x | %4s | %6s | %7s',
                  [String(Name), Version, pack, unpack, LibFile] ) );
       end;
     end;
