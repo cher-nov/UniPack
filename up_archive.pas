@@ -399,7 +399,7 @@ var
   ChunkPacked, ChunkLeft, write_size : SizeUInt;
   packed_size : QWord;
   i, upd_pos : Integer;
-  TempFile, SetNextFile : Boolean;
+  TempFile, PackingNow : Boolean;
   NewStreamStartPos : QWord;
   NewPackedSizes : array of QWord;
 begin
@@ -427,12 +427,12 @@ begin
 
   //packing and writing data
   ChunkLeft := 0;
-  SetNextFile := not aSolid;
-  while (FDplCurrentFile < FFiles.Count) or not aMethod.PackDone() do begin
-    if SetNextFile then begin
+  PackingNow := False;
+  while (FDplCurrentFile < FFiles.Count) or PackingNow do begin
+    if not aSolid and not PackingNow then begin
       aMethod.InitPack( GetEntry(FDplCurrentFile)^.Info.Size );
       upd_pos := FDplCurrentFile;
-      SetNextFile := False;
+      PackingNow := True;
     end;
     if (ChunkLeft = 0) and (aMethod.PackLeft() > 0) then begin
       repeat //read data to be packed, from pipeline
@@ -459,9 +459,10 @@ begin
     if aSolid then NewPackedSizes[0] += ChunkPacked
       else NewPackedSizes[upd_pos] += ChunkPacked;
 
-    if aMethod.PackDone() then begin
+    PackingNow := not aMethod.PackDone();
+    if not PackingNow then begin
       aMethod.EndPack();
-      SetNextFile := not aSolid;
+      PackingNow := False;
     end;
   end;
 
