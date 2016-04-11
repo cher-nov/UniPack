@@ -396,8 +396,8 @@ function TUniPackArchive.Save( NewFileName: String; aMethod: TUniPackMethod;
 var
   ArchFile : THandle;
   PackedBuf : Pointer;
-  PackedSize, ChunkDataLeft, write_size : SizeUInt;
-  BytesOut, PackUpSize, pks : QWord;
+  ChunkPacked, ChunkLeft, write_size : SizeUInt;
+  BytesOut, PackUpSize, packed_size : QWord;
   i, PackingFile : Integer;
   TempFile : Boolean;
   NewStreamStartPos : QWord;
@@ -429,10 +429,10 @@ begin
 
   //packing and writing data
   BytesOut := 0;
-  ChunkDataLeft := 0;
-  while (FDplCurrentFile < FFiles.Count) or (ChunkDataLeft > 0) do begin
+  ChunkLeft := 0;
+  while (FDplCurrentFile < FFiles.Count) or (ChunkLeft > 0) do begin
 
-    if ChunkDataLeft = 0 then begin
+    if ChunkLeft = 0 then begin
       if not aSolid and (BytesOut = 0) then begin
         PackingFile := FDplCurrentFile;
         PackUpSize := GetEntry(PackingFile)^.Info.Size;
@@ -441,17 +441,17 @@ begin
 
       //read data to be packed, from pipeline
       repeat
-        ChunkDataLeft += PipelineGetData( ChunkDataLeft );
+        ChunkLeft += PipelineGetData( ChunkLeft );
       until (
         not aSolid //if non-solid, read file data only once
-        or (ChunkDataLeft = FOutputBufSize) //FDplDataOutBuf is full
+        or (ChunkLeft = FOutputBufSize) //FDplDataOutBuf is full
         or (FDplCurrentFile = FFiles.Count) //data ended in pipeline
       );
-      aMethod.PackSetChunk( FDplDataOutBuf, ChunkDataLeft );
-      BytesOut += ChunkDataLeft;
+      aMethod.PackSetChunk( FDplDataOutBuf, ChunkLeft );
+      BytesOut += ChunkLeft;
     end;
 
-    PackedSize := aMethod.PackStep( PackedBuf, FPackBufSize, @ChunkDataLeft );
+    ChunkPacked := aMethod.PackStep( PackedBuf, FPackBufSize, @ChunkLeft );
     if aMethod.HasError() then begin
       FileClose( ArchFile );
       SysUtils.DeleteFile( NewFileName );
@@ -460,12 +460,12 @@ begin
       Exit( eupMethodError );
     end;
 
-    write_size := FileWrite( ArchFile, PackedBuf^, PackedSize );
+    write_size := FileWrite( ArchFile, PackedBuf^, ChunkPacked );
     //TODO: handle file error here
 
-    NewPackedSizes[PackingFile] += PackedSize;
+    NewPackedSizes[PackingFile] += ChunkPacked;
 
-    if not aSolid and (BytesOut = PackUpSize) and (ChunkDataLeft = 0) then begin
+    if not aSolid and (BytesOut = PackUpSize) and (ChunkLeft = 0) then begin
       //another one bites the dust
       aMethod.EndPack();
       BytesOut := 0;
@@ -477,10 +477,10 @@ begin
   UPA_WriteHeader( ArchFile, aMethod, aSolid );
   for i := 0 to FFiles.Count-1 do begin
     if not aSolid then
-      pks := NewPackedSizes[i]
+      packed_size := NewPackedSizes[i]
     else
-      pks := 0;
-    FAT_WriteEntry( ArchFile, i, pks );
+      packed_size := 0;
+    FAT_WriteEntry( ArchFile, i, packed_size );
   end;
 
   FileClose( ArchFile );
