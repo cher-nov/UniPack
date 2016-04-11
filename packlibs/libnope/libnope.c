@@ -7,8 +7,12 @@
 #include "libnope.h"
 
 static int lib_error = UP_OK;
+
+static up_datasize_t lib_pack_left;
 static char* lib_pack_chunk;
 static size_t lib_pack_size;
+
+static up_datasize_t lib_unpack_left;
 static char* lib_unpack_chunk;
 static size_t lib_unpack_size;
 
@@ -52,6 +56,7 @@ const char* up_error_msg( int err_code ) {
 /* compression functions */
 
 void up_pack_init( up_datasize_t pack_size ) {
+  lib_pack_left = pack_size;
   up_pack_chunk(NULL, 0);
 }
 
@@ -77,7 +82,12 @@ size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
   lib_pack_size -= copy_size;
   if (data_left != NULL) { *data_left = lib_pack_size; }
 
+  lib_pack_left -= copy_size;
   return copy_size;
+}
+
+bool up_pack_done() {
+  return (lib_pack_left == 0);
 }
 
 void up_pack_end() {
@@ -87,6 +97,7 @@ void up_pack_end() {
 /* decompression functions */
 
 void up_unpack_init( up_datasize_t unpack_size ) {
+  lib_unpack_left = unpack_size;
   up_unpack_chunk(NULL, 0);
 }
 
@@ -112,7 +123,12 @@ size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left )
   lib_unpack_size -= copy_size;
   if (data_left != NULL) { *data_left = lib_unpack_size; }
 
+  lib_unpack_left -= copy_size;
   return copy_size;
+}
+
+bool up_unpack_done() {
+  return (lib_unpack_left == 0);
 }
 
 void up_unpack_end() {
