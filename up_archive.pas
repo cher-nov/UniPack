@@ -94,7 +94,8 @@ type { UPA Archives management class ══════════════�
     procedure PipelineFree();
     function PipelineSetNext( FileIndex: Integer;
       SkipEmpty: Boolean = True ): Boolean;
-    function PipelineGetData( OutBufOffset: SizeUInt ): SizeUInt;
+    function PipelineGetData( OutBufOffset: SizeUInt = 0;
+      AutoNext: Boolean = False ): SizeUInt;
 
   public
     constructor Create();
@@ -441,7 +442,7 @@ begin
 
       //read data to be packed, from pipeline
       repeat
-        ChunkLeft += PipelineGetData( ChunkLeft );
+        ChunkLeft += PipelineGetData( ChunkLeft, True );
       until (
         not aSolid //if non-solid, read file data only once
         or (ChunkLeft = FOutputBufSize) //FDplDataOutBuf is full
@@ -567,7 +568,6 @@ function TUniPackArchive.WriteFiles( DirPath: String; FileIndexes: TIntList ): T
 var
   CurrentFile, FileCount, fnum : Integer;
   BytesRead : SizeUInt;
-  BytesWrite : QWord;
   filetime : Int64;
   hfile : THandle;
   entry : PFileEntryUPA;
@@ -598,18 +598,16 @@ begin
     end else begin
       CurrentFile := FileIndexes.Integers[fnum];
       fnum += 1;
-      PipelineSetNext( CurrentFile );
     end;
 
+    PipelineSetNext( CurrentFile );
     entry := GetEntry( CurrentFile );
     fname := DirPath + entry^.Info.Name;
     hfile := FileCreate( fname );
 
-    BytesWrite := 0;
-    while BytesWrite < entry^.Info.Size do begin
-      BytesRead := PipelineGetData(0);
+    while FDplFileBytesDone < entry^.Info.Size do begin
+      BytesRead := PipelineGetData();
       FileWrite( hfile, FDplDataOutBuf^, BytesRead );
-      BytesWrite += BytesRead;
     end;
 
     FileClose( hfile );
@@ -791,7 +789,7 @@ begin
         FDplCurrentFile += 1;
         PipelineResetState();
       end else begin
-        PipelineGetData(0);
+        PipelineGetData();
       end;
     until FDplCurrentFile = FileIndex;
   end;
@@ -799,7 +797,8 @@ begin
   Result := True;
 end;
 
-function TUniPackArchive.PipelineGetData( OutBufOffset: SizeUInt ): SizeUInt;
+function TUniPackArchive.PipelineGetData( OutBufOffset: SizeUInt;
+  AutoNext: Boolean ): SizeUInt;
 var
   entry : PFileEntryUPA;
   out_size, fread_size : SizeUInt;
@@ -807,12 +806,16 @@ var
   out_buf, void_buf : Pointer; //for skipping data
 begin
   Result := 0;
+
   if FDplCurrentFile = FFiles.Count then
     Exit;
   entry := GetEntry( FDplCurrentFile );
 
-  out_size := FOutputBufSize - OutBufOffset;
   left_size := entry^.Info.Size - FDplFileBytesDone;
+  if left_size = 0 then
+    Exit;
+
+  out_size := FOutputBufSize - OutBufOffset;
   if out_size > left_size then out_size := left_size;
   out_buf := FDplDataOutBuf + OutBufOffset;
 
@@ -864,7 +867,7 @@ begin
   end;
 
   FDplFileBytesDone += Result;
-  if FDplFileBytesDone = entry^.Info.Size then
+  if AutoNext and (FDplFileBytesDone = entry^.Info.Size) then
     PipelineSetNext( FDplCurrentFile+1 );
 end;
 
