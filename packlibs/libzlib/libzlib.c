@@ -46,10 +46,6 @@ const char* up_error_msg( int err_code ) {
   }
 }
 
-const char* up_last_error() {
-
-}
-
 /* compression functions */
 
 void up_pack_init( up_datasize_t pack_size ) {

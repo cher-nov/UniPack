@@ -21,7 +21,7 @@
 #endif
 
 #define DLL_NAME "ZLIB"
-#define DLL_VERSION 128
+#define DLL_VERSION ZLIB_VERNUM
 
 typedef unsigned long long int up_datasize_t;
 
