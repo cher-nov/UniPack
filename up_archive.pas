@@ -397,7 +397,7 @@ var
   ArchFile : THandle;
   PackedBuf : Pointer;
   PackedSize, ChunkDataLeft, write_size : SizeUInt;
-  BytesOut, PackUpSize : QWord;
+  BytesOut, PackUpSize, pks : QWord;
   i, PackingFile : Integer;
   TempFile : Boolean;
   NewStreamStartPos : QWord;
@@ -477,10 +477,10 @@ begin
   UPA_WriteHeader( ArchFile, aMethod, aSolid );
   for i := 0 to FFiles.Count-1 do begin
     if not aSolid then
-      PackedSize := NewPackedSizes[i]
+      pks := NewPackedSizes[i]
     else
-      PackedSize := 0;
-    FAT_WriteEntry( ArchFile, i, PackedSize );
+      pks := 0;
+    FAT_WriteEntry( ArchFile, i, pks );
   end;
 
   FileClose( ArchFile );
