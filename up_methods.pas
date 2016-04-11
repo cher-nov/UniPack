@@ -29,6 +29,8 @@ type { Auxiliary types for TUniPackMethod ════════════�
   upfunc_PackStep =
     function( outbuf: Pointer; outbuf_sz: SizeUInt;
       data_left: PSizeUInt = nil ): SizeUInt; cdecl;
+  upfunc_PackLeft =
+    function(): QWord; cdecl;
   upfunc_PackDone =
     function(): Boolean; cdecl;
   upfunc_EndPack =
@@ -40,6 +42,8 @@ type { Auxiliary types for TUniPackMethod ════════════�
   upfunc_UnpackStep =
     function( outbuf: Pointer; outbuf_sz: SizeUInt;
       data_left: PSizeUInt = nil ): SizeUInt; cdecl;
+  upfunc_UnpackLeft =
+    function(): QWord; cdecl;
   upfunc_UnpackDone =
     function(): Boolean; cdecl;
   upfunc_EndUnpack =
@@ -59,11 +63,13 @@ type { TUniPackMethod - UniPack method library ═══════════
     MInitPack : upfunc_InitPack;
     MPackSetChunk : upfunc_PackSetChunk;
     MPackStep : upfunc_PackStep;
+    MPackLeft : upfunc_PackLeft;
     MPackDone : upfunc_PackDone;
     MEndPack : upfunc_EndPack;
     MInitUnpack : upfunc_InitUnpack;
     MUnpackSetChunk : upfunc_UnpackSetChunk;
     MUnpackStep : upfunc_UnpackStep;
+    MUnpackLeft : upfunc_UnpackLeft;
     MUnpackDone : upfunc_UnpackDone;
     MEndUnpack : upfunc_EndUnpack;
     //variables
@@ -88,11 +94,13 @@ type { TUniPackMethod - UniPack method library ═══════════
     property InitPack: upfunc_InitPack read MInitPack;
     property PackSetChunk: upfunc_PackSetChunk read MPackSetChunk;
     property PackStep: upfunc_PackStep read MPackStep;
+    property PackLeft: upfunc_PackLeft read MPackLeft;
     property PackDone: upfunc_PackDone read MPackDone;
     property EndPack: upfunc_EndPack read MEndPack;
     property InitUnpack: upfunc_InitUnpack read MInitUnpack;
     property UnpackSetChunk: upfunc_UnpackSetChunk read MUnpackSetChunk;
     property UnpackStep: upfunc_UnpackStep read MUnpackStep;
+    property UnpackLeft: upfunc_UnpackLeft read MUnpackLeft;
     property UnpackDone: upfunc_UnpackDone read MUnpackDone;
     property EndUnpack: upfunc_EndUnpack read MEndUnpack;
 
@@ -202,13 +210,16 @@ begin
     GetProcedureAddress( FLibrary, 'up_pack_chunk' ) );
   MPackStep := upfunc_PackStep(
     GetProcedureAddress( FLibrary, 'up_pack_step' ) );
+  MPackLeft := upfunc_PackLeft(
+    GetProcedureAddress( FLibrary, 'up_pack_left' ) );
   MPackDone := upfunc_PackDone(
     GetProcedureAddress( FLibrary, 'up_pack_done' ) );
   MEndPack := upfunc_EndPack(
     GetProcedureAddress( FLibrary, 'up_pack_end' ) );
 
   FCanPack := Assigned(MInitPack) and Assigned(MPackSetChunk)
-    and Assigned(MPackStep) and Assigned(MPackDone) and Assigned(MEndPack);
+    and Assigned(MPackStep) and Assigned(MPackLeft) and Assigned(MPackDone)
+    and Assigned(MEndPack);
 
   MInitUnpack := upfunc_InitUnpack(
     GetProcedureAddress( FLibrary, 'up_unpack_init' ) );
@@ -216,13 +227,16 @@ begin
     GetProcedureAddress( FLibrary, 'up_unpack_chunk' ) );
   MUnpackStep := upfunc_UnpackStep(
     GetProcedureAddress( FLibrary, 'up_unpack_step' ) );
+  MUnpackLeft := upfunc_UnpackLeft(
+    GetProcedureAddress( FLibrary, 'up_unpack_left' ) );
   MUnpackDone := upfunc_UnpackDone(
     GetProcedureAddress( FLibrary, 'up_unpack_done' ) );
   MEndUnpack := upfunc_EndUnpack(
     GetProcedureAddress( FLibrary, 'up_unpack_end' ) );
 
   FCanUnpack := Assigned(MInitUnpack) and Assigned(MUnpackSetChunk)
-    and Assigned(MUnpackStep) and Assigned(MUnpackDone) and Assigned(MEndUnpack);
+    and Assigned(MUnpackStep) and Assigned(MUnpackLeft) and Assigned(MUnpackDone)
+    and Assigned(MEndUnpack);
 
   if not FCanPack and not FCanUnpack then
     Exit( False );
