@@ -802,8 +802,8 @@ end;
 function TUniPackArchive.PipelineGetData( OutBufOffset: SizeUInt ): SizeUInt;
 var
   entry : PFileEntryUPA;
-  out_size, chunk_size, fread_size : SizeUInt;
-  left_size, packed_size, skip_size : QWord;
+  out_size, fread_size : SizeUInt;
+  left_size, packed_size, chunk_size, skip_size : QWord;
   out_buf, void_buf : Pointer; //for skipping data
 begin
   Result := 0;
