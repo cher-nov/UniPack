@@ -811,6 +811,7 @@ begin
     if OutBufOffset = 0 then void_buf := FDplDataOutBuf
       else void_buf := GetMem( FOutputBufSize );
 
+    skip_size := 0;
     repeat
       //feeding new packed data chunk, if needed
       chunk_size := FMethod.UnpackLeft();
@@ -824,13 +825,13 @@ begin
       end;
 
       //performing decompression step
+      FDplSkippedBefore += skip_size;
       if not FSolid or (FDplSkippedBefore = entry^.SkipBytesBefore) then begin
         Result := FMethod.UnpackStep( out_buf, out_size, @FDplChunkDataLeft );
       end else begin //if less
         skip_size := entry^.SkipBytesBefore - FDplSkippedBefore;
         if skip_size > FOutputBufSize then out_size := FOutputBufSize;
         skip_size := FMethod.UnpackStep( void_buf, skip_size, @FDplChunkDataLeft );
-        FDplSkippedBefore += skip_size;
       end;
     until FDplSkippedBefore = entry^.SkipBytesBefore;
 
