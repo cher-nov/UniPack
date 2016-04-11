@@ -17,7 +17,7 @@ const
   upaMaxFiles = 65535;
   upaInvalidIndex = -1;
   upaPackBufStd = 512 * 1024; // 512 Kb
-  upaOutputBufStd = 512 * 1024;
+  upaOutputBufStd = 768 * 1024; // 768 Kb
 
 type { UPA Archives management class ═════════════════════════════════════════ }
 
