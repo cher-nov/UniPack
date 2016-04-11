@@ -15,7 +15,7 @@ type { ═ TMainApp ────────────────────
 
   TMainApp = class( TCustomApplication )
   const
-    APPVER = '0.3';
+    APPVER = '0.3.1';
   strict private
     FWorkMode : ( MODE_UNKNOWN, MODE_PACK, MODE_UNPACK, MODE_REPACK );
     fNewPackBufSize : SizeUInt;
@@ -65,8 +65,8 @@ begin
     WriteLn( '  -l - output list of avaliable compression methods and exit' );
     //WriteLn( '  -i - output file information and exit' );
     WriteLn( '  -s - create solid archive' );
-    WriteLn( '  -pbuf SIZE - set size of pack buffer, in KBytes' );
-    WriteLn( '  -obuf SIZE - set size of output/unpack buffers, in KBytes' );
+    WriteLn( '  -pbuf SIZE - set size of packed data buffer, in KBytes' );
+    WriteLn( '  -obuf SIZE - set size of output buffers, in KBytes' );
     //WriteLn( '  -q - quiet mode (without detailed logging)' );
     Terminate(); Exit();
   end;
@@ -207,6 +207,7 @@ var
   ArchUPA : TUniPackArchive;
   PackFile : TSearchRec;
   ErrorUPA : TErrorUPA;
+  errcode : integer;
 begin
   WriteLn( 'File: ', AFile );
   WriteLn( 'Path: ', ADir );
@@ -229,8 +230,10 @@ begin
     WriteLn( 'WARNING: directory is empty, no files were packed' );
 
   ErrorUPA := ArchUPA.Save( AFile, AMethod, ASolid, False );
-  if ErrorUPA <> eupOK then
-    writeln( 'pack error: ', ErrStrUPA( ErrorUPA ), ' ', AMethod.LastError() );
+  if ErrorUPA <> eupOK then begin
+    AMethod.HasError(@errcode);
+    writeln( 'pack error: ', ErrStrUPA( ErrorUPA ), ' ', AMethod.ErrorMsg(errcode) );
+  end;
   ArchUPA.Destroy();
 end;
 
