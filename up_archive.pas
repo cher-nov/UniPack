@@ -61,7 +61,6 @@ type { UPA Archives management class ══════════════�
     FDplDataOutBuf : Pointer;
     FDplCurrentFile : Integer;
     FDplFileBytesDone : QWord;
-    FDplPackedDataPos : QWord;
     FDplChunkDataLeft : SizeUInt;
     FDplSkippedBefore : QWord; //needed for solid stream
 
@@ -703,10 +702,8 @@ procedure TUniPackArchive.PipelineResetState( Forced: Boolean );
 begin
   FDplFileBytesDone := 0;
   FDplSkippedBefore := 0; //needed only on solid stream
-  if not FSolid or Forced then begin
-    FDplPackedDataPos := 0;
+  if not FSolid or Forced then
     FDplChunkDataLeft := 0;
-  end;
 end;
 
 procedure TUniPackArchive.PipelineEndUnpack();
@@ -789,7 +786,7 @@ function TUniPackArchive.PipelineGetData( OutBufOffset: SizeUInt;
 var
   entry : PFileEntryUPA;
   out_size, fread_size : SizeUInt;
-  left_size, packed_size, chunk_size, skip_size : QWord;
+  left_size, chunk_size, skip_size : QWord;
   out_buf, void_buf : Pointer; //for skipping data
 begin
   Result := 0;
@@ -814,16 +811,13 @@ begin
 
     repeat
       //feeding new packed data chunk, if needed
-      if FSolid then packed_size := FStreamSize
-        else packed_size := entry^.Info.PackSize;
-      chunk_size := packed_size - FDplPackedDataPos;
+      chunk_size := FMethod.UnpackLeft();
       if (FDplChunkDataLeft = 0) and (chunk_size > 0) then begin
         if chunk_size > FPackBufSize then chunk_size := FPackBufSize;
         fread_size := FileRead( FFileHandle, FDplPackedBuf^, chunk_size );
         if fread_size <> chunk_size then
           Exit;
         FMethod.UnpackSetChunk( FDplPackedBuf, chunk_size );
-        FDplPackedDataPos += chunk_size;
         FDplChunkDataLeft := chunk_size;
       end;
 
