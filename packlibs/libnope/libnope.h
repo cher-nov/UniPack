@@ -21,7 +21,7 @@
 #endif
 
 #define DLL_NAME "NOPE"
-#define DLL_VERSION 1
+#define DLL_VERSION 0x1000
 
 #define UP_OK 0
 #define UP_UNKNOWN_ERROR (-1)
