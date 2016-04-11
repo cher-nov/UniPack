@@ -93,6 +93,10 @@ size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
   }
 }
 
+up_datasize_t up_pack_left() {
+  return lib_pack_left;
+}
+
 bool up_pack_done() {
   return ( (lib_pack_left == 0) && lib_pack_flushed );
 }
@@ -138,6 +142,10 @@ size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left )
       lib_error = result;
       return 0;
   }
+}
+
+up_datasize_t up_unpack_left() {
+  return lib_unpack_left;
 }
 
 bool up_unpack_done() {
