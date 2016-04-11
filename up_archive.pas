@@ -398,9 +398,9 @@ var
   ArchFile : THandle;
   PackedBuf : Pointer;
   ChunkPacked, ChunkLeft, write_size : SizeUInt;
-  BytesOut, PackUpSize, packed_size : QWord;
-  i, PackingFile : Integer;
-  TempFile : Boolean;
+  packed_size : QWord;
+  i, upd_pos : Integer;
+  TempFile, SetNextFile : Boolean;
   NewStreamStartPos : QWord;
   NewPackedSizes : array of QWord;
 begin
@@ -418,30 +418,25 @@ begin
   PipelineInit();
   PackedBuf := GetMem( FPackBufSize );
 
-  PackingFile := 0;
+  upd_pos := 0;
   if aSolid then begin
     SetLength( NewPackedSizes, 1 );
-    PackUpSize := FAllFilesSize;
-    aMethod.InitPack( PackUpSize );
+    aMethod.InitPack( FAllFilesSize );
   end else begin
     SetLength( NewPackedSizes, FFiles.Count );
-    PackUpSize := 0;
   end;
 
   //packing and writing data
-  BytesOut := 0;
   ChunkLeft := 0;
-  while (FDplCurrentFile < FFiles.Count) or (ChunkLeft > 0) do begin
-
-    if ChunkLeft = 0 then begin
-      if not aSolid and (BytesOut = 0) then begin
-        PackingFile := FDplCurrentFile;
-        PackUpSize := GetEntry(PackingFile)^.Info.Size;
-        aMethod.InitPack( PackUpSize );
-      end;
-
-      //read data to be packed, from pipeline
-      repeat
+  SetNextFile := not aSolid;
+  while (FDplCurrentFile < FFiles.Count) or not aMethod.PackDone() do begin
+    if SetNextFile then begin
+      aMethod.InitPack( GetEntry(FDplCurrentFile)^.Info.Size );
+      upd_pos := FDplCurrentFile;
+      SetNextFile := False;
+    end;
+    if (ChunkLeft = 0) and (aMethod.PackLeft() > 0) then begin
+      repeat //read data to be packed, from pipeline
         ChunkLeft += PipelineGetData( ChunkLeft, True );
       until (
         not aSolid //if non-solid, read file data only once
@@ -449,7 +444,6 @@ begin
         or (FDplCurrentFile = FFiles.Count) //data ended in pipeline
       );
       aMethod.PackSetChunk( FDplDataOutBuf, ChunkLeft );
-      BytesOut += ChunkLeft;
     end;
 
     ChunkPacked := aMethod.PackStep( PackedBuf, FPackBufSize, @ChunkLeft );
@@ -463,35 +457,29 @@ begin
 
     write_size := FileWrite( ArchFile, PackedBuf^, ChunkPacked );
     //TODO: handle file error here
+    if aSolid then NewPackedSizes[0] += ChunkPacked
+      else NewPackedSizes[upd_pos] += ChunkPacked;
 
-    NewPackedSizes[PackingFile] += ChunkPacked;
-
-    if not aSolid and (BytesOut = PackUpSize) and (ChunkLeft = 0) then begin
-      //another one bites the dust
+    if aMethod.PackDone() then begin
       aMethod.EndPack();
-      BytesOut := 0;
+      SetNextFile := not aSolid;
     end;
-
   end;
 
   SetFilePos( ArchFile, 0 );
   UPA_WriteHeader( ArchFile, aMethod, aSolid );
   for i := 0 to FFiles.Count-1 do begin
-    if not aSolid then
-      packed_size := NewPackedSizes[i]
-    else
-      packed_size := 0;
+    if aSolid then packed_size := 0
+      else packed_size := NewPackedSizes[i];
     FAT_WriteEntry( ArchFile, i, packed_size );
   end;
 
   FileClose( ArchFile );
-  if aSolid then aMethod.EndPack();
   PipelineFree();
   FreeMem( PackedBuf );
 
-  if RemapToNew then
-    UPA_RemapArchive( NewFileName, TempFile, aMethod, aSolid,
-      NewStreamStartPos, NewPackedSizes );
+  if RemapToNew then UPA_RemapArchive( NewFileName, TempFile, aMethod, aSolid,
+    NewStreamStartPos, NewPackedSizes );
 
   Result := eupOK;
 end;
@@ -512,14 +500,17 @@ var
   info : TFileInfoUPA;
   index : Integer;
 begin
-  if FFiles.Count = upaMaxFiles then Exit( False );
-  if not FileExists( FileName ) then Exit( False );
+  if FFiles.Count = upaMaxFiles then
+    Exit( False );
+  if not FileExists( FileName ) then
+    Exit( False );
 
   info.Attr := UPA_GetFileAttr( FileName );
   info.Time := GetFileTimePOSIX( FileName );
 
   hfile := FileOpen( FileName, fmOpenRead or fmShareDenyWrite );
-  if hfile = UnusedHandle then Exit( False );
+  if hfile = UnusedHandle then
+    Exit( False );
 
   info.Name := ExtractFileName( FileName );
   info.Size := GetFileSize( hfile );
@@ -527,10 +518,8 @@ begin
 
   index := AddEntry( info, hfile, 0 );
   Result := index <> upaInvalidIndex;
-  if Result then
-    FAllFilesSize += info.Size
-  else
-    FileClose( hfile );
+  if Result then FAllFilesSize += info.Size
+    else FileClose( hfile );
 end;
 
 procedure TUniPackArchive.DeleteFile( Index: Integer );
@@ -630,7 +619,8 @@ var
   entry : PFileEntryUPA;
 begin
   New( entry );
-  if entry = nil then Exit( upaInvalidIndex );
+  if entry = nil then
+    Exit( upaInvalidIndex );
 
   with entry^ do begin
     Info := aInfo;
@@ -700,10 +690,8 @@ begin
   if FPackedCount > 0 then begin
     FDplPackedBuf := GetMem( FPackBufSize );
     SetFilePos( FFileHandle, FStreamStartPos );
-    if FSolid then
-      packed_size := FStreamSize
-    else
-      packed_size := entry^.Info.PackSize;
+    if FSolid then packed_size := FStreamSize
+      else packed_size := entry^.Info.PackSize;
     FMethod.InitUnpack( packed_size );
 
   end else begin
@@ -749,10 +737,8 @@ begin
     Exit( False );
   not_empty := FindFirstNotEmptyFile( FileIndex );
   if not_empty > FileIndex then begin
-    if SkipEmpty then
-      FileIndex := not_empty
-    else
-      Exit( False );
+    if SkipEmpty then FileIndex := not_empty
+      else Exit( False );
   end;
 
   if FileIndex = FFiles.Count then begin
@@ -783,11 +769,12 @@ begin
     //old and new index to skip them (we don't use unpacked data here)
     //note: empty files between old and new indexes will be successfully
     //skipped because FDplFileBytesDone will equal to 0
+    entry := GetEntry( FDplCurrentFile );
     repeat
-      entry := GetEntry( FDplCurrentFile );
       if entry^.Info.Size = FDplFileBytesDone then begin
         FDplCurrentFile += 1;
         PipelineResetState();
+        entry := GetEntry( FDplCurrentFile );
       end else begin
         PipelineGetData();
       end;
@@ -822,19 +809,15 @@ begin
   if FDplCurrentFile < FPackedCount then begin
     //if OutBufOffset > 0 then user may need data in FDplDataOutBuf before
     //this offset, so we allocate another buffer to skip data
-    if OutBufOffset > 0 then
-      void_buf := GetMem( FOutputBufSize )
-    else
-      void_buf := FDplDataOutBuf;
+    if OutBufOffset = 0 then void_buf := FDplDataOutBuf
+      else void_buf := GetMem( FOutputBufSize );
 
     repeat
       //feeding new packed data chunk, if needed
-      if FDplChunkDataLeft = 0 then begin
-        if FSolid then
-          packed_size := FStreamSize
-        else
-          packed_size := entry^.Info.PackSize;
-        chunk_size := packed_size - FDplPackedDataPos;
+      if FSolid then packed_size := FStreamSize
+        else packed_size := entry^.Info.PackSize;
+      chunk_size := packed_size - FDplPackedDataPos;
+      if (FDplChunkDataLeft = 0) and (chunk_size > 0) then begin
         if chunk_size > FPackBufSize then chunk_size := FPackBufSize;
         fread_size := FileRead( FFileHandle, FDplPackedBuf^, chunk_size );
         if fread_size <> chunk_size then
@@ -845,7 +828,7 @@ begin
       end;
 
       //performing decompression step
-      if (FDplSkippedBefore = entry^.SkipBytesBefore) or not FSolid then begin
+      if not FSolid or (FDplSkippedBefore = entry^.SkipBytesBefore) then begin
         Result := FMethod.UnpackStep( out_buf, out_size, @FDplChunkDataLeft );
       end else begin //if less
         skip_size := entry^.SkipBytesBefore - FDplSkippedBefore;
