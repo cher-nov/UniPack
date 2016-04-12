@@ -590,7 +590,7 @@ begin
       fnum += 1;
     end;
 
-    PipelineSetNext( CurrentFile );
+    PipelineSetNext( CurrentFile, False );
     entry := GetEntry( CurrentFile );
     fname := DirPath + entry^.Info.Name;
     hfile := FileCreate( fname );
@@ -729,16 +729,11 @@ var
   entry : PFileEntryUPA;
   seek_file : THandle;
   seek_pos : QWord;
-  not_empty : Integer;
 begin
   if FileIndex <= FDplCurrentFile then
     Exit( False );
-  not_empty := FindFirstNotEmptyFile( FileIndex );
-  if not_empty > FileIndex then begin
-    if SkipEmpty then FileIndex := not_empty
-      else Exit( False );
-  end;
-
+  if SkipEmpty then
+    FileIndex := FindFirstNotEmptyFile( FileIndex );
   if FileIndex >= FFiles.Count then begin
     FDplCurrentFile := FFiles.Count;
     PipelineResetState();
