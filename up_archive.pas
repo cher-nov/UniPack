@@ -62,7 +62,7 @@ type { UPA Archives management class ══════════════�
     FDplCurrentFile : Integer;
     FDplFileBytesLeft : QWord;
     FDplChunkDataLeft : SizeUInt;
-    FDplSkippedBefore : QWord; //needed for solid stream
+    FDplSkipBytesLeft : QWord; //needed only for solid stream
 
     procedure Init(); inline;
 
@@ -671,7 +671,7 @@ end;
   (even if archive is solid, obviously) and begin to unpack data.
   Note that files must be enumerated ascendingly when accessing.
   For solid archives: if packed file that was between two packed too, was
-  removed, it's data will be skipped automatically (see FDplSkippedBefore and
+  removed, it's data will be skipped automatically (see FDplSkipBytesLeft and
   TFileEntryUPA.SkipBytesBefore).
 }
 
@@ -700,10 +700,17 @@ begin
 end;
 
 procedure TUniPackArchive.PipelineResetState( Forced: Boolean );
+var
+  entry : PFileEntryUPA;
 begin
-  FDplSkippedBefore := 0; //needed only on solid stream
-  if FDplCurrentFile = FFiles.Count then FDplFileBytesLeft := 0
-    else FDplFileBytesLeft := GetEntry(FDplCurrentFile)^.Info.Size;
+  if FDplCurrentFile = FFiles.Count then begin
+    FDplFileBytesLeft := 0;
+    FDplSkipBytesLeft := 0;
+  end else begin
+    entry := GetEntry( FDplCurrentFile );
+    FDplFileBytesLeft := entry^.Info.Size;
+    FDplSkipBytesLeft := entry^.SkipBytesBefore;
+  end;
   if not FSolid or Forced then
     FDplChunkDataLeft := 0;
 end;
@@ -779,7 +786,6 @@ end;
 function TUniPackArchive.PipelineGetData( OutBufOffset: SizeUInt;
   AutoNext: Boolean ): SizeUInt;
 var
-  entry : PFileEntryUPA;
   out_size, fread_size : SizeUInt;
   chunk_size, skip_size : QWord;
   out_buf, void_buf : Pointer; //for skipping data
@@ -790,7 +796,6 @@ begin
     PipelineSetNext( FDplCurrentFile+1 );
   if (FDplFileBytesLeft = 0) then
     Exit;
-  entry := GetEntry( FDplCurrentFile );
 
   out_size := FOutputBufSize - OutBufOffset;
   if out_size > FDplFileBytesLeft then out_size := FDplFileBytesLeft;
@@ -816,22 +821,23 @@ begin
       end;
 
       //performing decompression step
-      FDplSkippedBefore += skip_size;
-      if not FSolid or (FDplSkippedBefore = entry^.SkipBytesBefore) then begin
+      FDplSkipBytesLeft -= skip_size;
+      if not FSolid or (FDplSkipBytesLeft = 0) then begin
         Result := FMethod.UnpackStep( out_buf, out_size, @FDplChunkDataLeft );
       end else begin //if less
-        skip_size := entry^.SkipBytesBefore - FDplSkippedBefore;
+        skip_size := FDplSkipBytesLeft;
         if skip_size > FOutputBufSize then skip_size := FOutputBufSize;
         skip_size := FMethod.UnpackStep( void_buf, skip_size, @FDplChunkDataLeft );
       end;
-    until FDplSkippedBefore = entry^.SkipBytesBefore;
+    until FDplSkipBytesLeft = 0;
 
     if void_buf <> FDplDataOutBuf then
       FreeMem( void_buf );
 
   end else begin
     //if we are on non-packed files now, simply read bytes
-    fread_size := FileRead( entry^.Handle, out_buf^, out_size );
+    fread_size := FileRead( GetEntry(FDplCurrentFile)^.Handle,
+      out_buf^, out_size );
     if fread_size <> out_size then
       Exit;
     Result := out_size;
