@@ -15,21 +15,22 @@ type { ═ TMainApp ────────────────────
 
   TMainApp = class( TCustomApplication )
   const
-    APPVER = '0.3.1';
+    sAppVersion = '0.3.2';
   strict private
-    FWorkMode : ( MODE_UNKNOWN, MODE_PACK, MODE_UNPACK, MODE_REPACK );
-    fNewPackBufSize : SizeUInt;
-    fNewOutputBufSize : SizeUInt;
-    //FErrorNum : Integer;
-    //procedure ErrorMsg(  );
-    procedure LoadMethods( ADir: String );
+    fWorkMode : ( awmUnknown, awmPack, awmUnpack, awmRepack );
+    fArchCtx : TUniPackArchive;
+    fError : TErrorUPA;
+    fProcArch : String;
+    fProcDir : String;
+    fSolid : Boolean;
+    fMethod : TUniPackMethod;
+    procedure LoadMethods( aDir: String );
     procedure EnumMethods();
+    procedure AppDoPack();
+    procedure AppDoRepack();
+    procedure AppDoUnpack();
     function ErrStrUPA( ErrCode: TErrorUPA ): String;
-    procedure AppDoPack( AFile, ADir: String; AMethod: TUniPackMethod;
-      ASolid: Boolean  );
-    procedure AppDoRepack( AFile: String; AMethod: TUniPackMethod;
-      ASolid: Boolean  );
-    procedure AppDoUnpack( AFile, ADir: String );
+    function YesNo( expr: Boolean ): String; inline;
   protected
     procedure DoRun(); override;
   public
@@ -41,12 +42,10 @@ type { ═ TMainApp ────────────────────
 
 procedure TMainApp.DoRun();
 var
-  ProcUPA, ProcDir : String;
-  OptUPA, OptDir, OptSolid : Boolean;
-  PackMethod : TUniPackMethod;
+  OptArch, OptDir : Boolean;
   method_name : uplib_MethodName;
 begin
-  WriteLn( Title, ' ', APPVER );
+  WriteLn( Title, ' ', sAppVersion );
   WriteLn( 'Written by KoDi Studio, 2015-2016' );
 
   if ParamCount = 0 then begin
@@ -78,103 +77,113 @@ begin
     Terminate(); Exit();
   end;
 
-  PackMethod := nil;
+  fMethod := nil;
   if HasOption('a') then begin
     method_name := GetOptionValue('a');
-    PackMethod := TUniPackMethod.Get( method_name );
-    if PackMethod = nil then begin
+    fMethod := TUniPackMethod.Get( method_name );
+    if fMethod = nil then begin
       WriteLn( 'ERROR: unknown compression method: ', method_name );
       Terminate(); Exit();
     end;
-    FWorkMode := MODE_PACK;
+    fWorkMode := awmPack;
   end;
 
   if HasOption('u') then begin
-    if FWorkMode = MODE_UNKNOWN then FWorkMode := MODE_UNPACK else
-    if FWorkMode = MODE_PACK    then FWorkMode := MODE_REPACK;
+    if fWorkMode = awmUnknown then fWorkMode := awmUnpack else
+    if fWorkMode = awmPack    then fWorkMode := awmRepack;
   end;
 
-  case FWorkMode of 
-    MODE_PACK:   WriteLn( 'Pack mode' );
-    MODE_UNPACK: WriteLn( 'Unpack mode' );
-    MODE_REPACK: WriteLn( 'Repack mode' );
+  case fWorkMode of 
+    awmPack:   WriteLn( 'Pack mode' );
+    awmUnpack: WriteLn( 'Unpack mode' );
+    awmRepack: WriteLn( 'Repack mode' );
     else begin
       WriteLn( 'Invalid arguments specified. Type "unipack.exe" to show help.' );
       Terminate(); Exit();
     end;
   end;
 
-  OptUPA := HasOption('F');
+  OptArch := HasOption('F');
   OptDir := HasOption('D');
-  OptSolid := HasOption('s');
 
-  if FWorkMode = MODE_PACK then begin
+  if fWorkMode = awmPack then begin
     if not OptDir then begin
-      WriteLn( 'ERROR: directory to pack isn`t specified.' );
+      WriteLn( 'ERROR: directory to pack isn''t specified.' );
       Terminate(); Exit();
     end else begin
-      ProcDir := ExpandFileName(
+      fProcDir := ExpandFileName(
         ExcludeTrailingPathDelimiter( GetOptionValue('D') ) );
-      if not DirectoryExists( ProcDir ) then begin
-        WriteLn( 'ERROR: directory doesn`t exist: ', ProcDir );
+      if not DirectoryExists( fProcDir ) then begin
+        WriteLn( 'ERROR: directory doesn''t exist: ', fProcDir );
         Terminate(); Exit();
       end;
     end;
-    if OptUPA then ProcUPA := GetOptionValue('F')
-              else ProcUPA := ProcDir + upaFileExt;
-    if FileExists( ProcUPA ) then begin
-      WriteLn( 'ERROR: file already exists: ', ProcUPA );
+    if OptArch then fProcArch := GetOptionValue('F')
+               else fProcArch := fProcDir + upaFileExt;
+    if FileExists( fProcArch ) then begin
+      WriteLn( 'ERROR: file already exists: ', fProcArch );
       Terminate(); Exit();
     end;
   end;
       
-  if FWorkMode in [MODE_UNPACK, MODE_REPACK] then begin
-    if not OptUPA then begin
-      WriteLn( 'ERROR: file to unpack/repack isn`t specified.' );
+  if fWorkMode in [awmUnpack, awmRepack] then begin
+    if not OptArch then begin
+      WriteLn( 'ERROR: file to unpack/repack isn''t specified.' );
       Terminate(); Exit();
     end else begin
-      ProcUPA := ExpandFileName( GetOptionValue('F') );
-      if not FileExists( ProcUPA ) then begin
-        WriteLn( 'ERROR: file doesn`t exist: ', ProcUPA );
+      fProcArch := ExpandFileName( GetOptionValue('F') );
+      if not FileExists( fProcArch ) then begin
+        WriteLn( 'ERROR: file doesn''t exist: ', fProcArch );
         Terminate(); Exit();
       end;
     end;
-    if FWorkMode <> MODE_REPACK then begin
-      if OptDir then ProcDir := GetOptionValue('D')
-                else ProcDir := ChangeFileExt( ProcUPA, EmptyStr );
-      CreateDir( ProcDir ); //no exception if dir already exists
+    if fWorkMode <> awmRepack then begin
+      if OptDir then fProcDir := GetOptionValue('D')
+                else fProcDir := ChangeFileExt( fProcArch, EmptyStr );
+      CreateDir( fProcDir ); //no exception if dir already exists
     end;
   end;
 
-  if HasOption('pbuf') then
-    fNewPackBufSize := 1024 * StrToInt( GetOptionValue('pbuf') )
-  else
-    fNewPackBufSize := 0;
-  if HasOption('obuf') then
-    fNewOutputBufSize := 1024 * StrToInt( GetOptionValue('obuf') )
-  else
-    fNewOutputBufSize := 0;
   
-  case FWorkMode of 
-    MODE_PACK:   AppDoPack  ( ProcUPA, ProcDir, PackMethod, OptSolid );
-    MODE_REPACK: AppDoRepack( ProcUPA, PackMethod, OptSolid );
-    MODE_UNPACK: AppDoUnpack( ProcUPA, ProcDir );
+
+  fSolid := HasOption('s');
+  WriteLn( 'File: ', fProcArch );
+  if fWorkMode <> awmRepack then WriteLn( 'Path: ', fProcDir );
+  if fWorkMode <> awmUnpack then WriteLn( 'Make solid: ', YesNo(fSolid) );
+
+  fArchCtx := TUniPackArchive.Create();
+  if HasOption('pbuf') then
+    fArchCtx.PackBufSize := 1024*StrToInt( GetOptionValue('pbuf') );
+  if HasOption('obuf') then
+    fArchCtx.OutputBufSize := 1024*StrToInt( GetOptionValue('obuf') );
+
+  WriteLn( 'Packed data buffer size: ', fArchCtx.PackBufSize, ' bytes' );
+  WriteLn( 'Output buffers size: ', fArchCtx.OutputBufSize, ' bytes' );
+
+  WriteLn();
+  case fWorkMode of 
+    awmPack:   AppDoPack();
+    awmRepack: AppDoRepack();
+    awmUnpack: AppDoUnpack();
   end;
 
+  if fError <> eupOK then
+    WriteLn( 'ERROR: ', ErrStrUPA(fError) );
+  fArchCtx.Free();
   Terminate();
 end;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
 
 //loading all available methods libraries
-procedure TMainApp.LoadMethods( ADir: String );
+procedure TMainApp.LoadMethods( aDir: String );
 var
   EnumFile : TSearchRec;
 begin
-  ADir := Location + IncludeTrailingPathDelimiter( ADir );
-  if FindFirst( ADir+'*.'+SharedSuffix, 0, EnumFile ) = 0 then begin
+  aDir := Location + IncludeTrailingPathDelimiter( aDir );
+  if FindFirst( aDir+'*.'+SharedSuffix, 0, EnumFile ) = 0 then begin
     repeat
-      if not TUniPackMethod.Load( ADir+EnumFile.Name ) then
+      if not TUniPackMethod.Load( aDir+EnumFile.Name ) then
         WriteLn( 'ERROR: unable to load method library: ', EnumFile.Name );
     until FindNext( EnumFile ) <> 0;
   end else
@@ -201,102 +210,66 @@ end;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
 
-procedure TMainApp.AppDoPack( AFile, ADir: String; AMethod: TUniPackMethod;
-  ASolid: Boolean );
+procedure TMainApp.AppDoPack();
 var
-  ArchUPA : TUniPackArchive;
   PackFile : TSearchRec;
-  ErrorUPA : TErrorUPA;
-  errcode : integer;
 begin
-  WriteLn( 'File: ', AFile );
-  WriteLn( 'Path: ', ADir );
-  WriteLn();
-
-  ArchUPA := TUniPackArchive.Create();
-  if fNewPackBufSize > 0 then ArchUPA.PackBufSize := fNewPackBufSize;
-  if fNewOutputBufSize > 0 then ArchUPA.OutputBufSize := fNewOutputBufSize;
-  ADir := IncludeTrailingPathDelimiter(ADir);
-
-  if FindFirst( ADir+'*', faAnyFile xor faDirectory, PackFile ) = 0 then begin
+  fProcDir := IncludeTrailingPathDelimiter( fProcDir );
+  if FindFirst( fProcDir+'*', faAnyFile xor faDirectory, PackFile ) = 0 then
+  begin
     repeat
-      if ArchUPA.AddFile( ADir+PackFile.Name ) then
-        WriteLn( 'added: ', PackFile.Name )
+      if fArchCtx.AddFile( fProcDir+PackFile.Name ) then
+        WriteLn( 'Added: ', PackFile.Name )
       else
-        WriteLn( 'failed: ', PackFile.Name );
+        WriteLn( 'FAILED: ', PackFile.Name );
     until FindNext( PackFile ) <> 0;
-    WriteLn( 'packing, please wait...' );
-  end else
+    WriteLn( 'Writing archive, please wait...' );
+  end else begin
     WriteLn( 'WARNING: directory is empty, no files were packed' );
-
-  ErrorUPA := ArchUPA.Save( AFile, AMethod, ASolid, False );
-  if ErrorUPA <> eupOK then begin
-    AMethod.HasError(@errcode);
-    writeln( 'pack error: ', ErrStrUPA( ErrorUPA ), ' ', AMethod.ErrorMsg(errcode) );
   end;
-  ArchUPA.Destroy();
+
+  fError := fArchCtx.Save( fProcArch, fMethod, fSolid, False );
 end;
 
-procedure TMainApp.AppDoRepack( AFile: String; AMethod: TUniPackMethod;
-  ASolid: Boolean );
-var
-  ArchUPA : TUniPackArchive;
-  ErrorUPA : TErrorUPA;
+procedure TMainApp.AppDoRepack();
 begin
-  WriteLn( 'File: ', AFile );
-  ArchUPA := TUniPackArchive.Create();
-  if fNewPackBufSize > 0 then ArchUPA.PackBufSize := fNewPackBufSize;
-  if fNewOutputBufSize > 0 then ArchUPA.OutputBufSize := fNewOutputBufSize;
+  fError := fArchCtx.Open( fProcArch );
+  if fError <> eupOK then Exit;
 
-  ErrorUPA := ArchUPA.Open( AFile );
-  if ErrorUPA <> eupOK then begin
-    WriteLn( 'UPA ERROR: ', ErrStrUPA( ErrorUPA ) );
-    Exit();
-  end;
-
-  WriteLn( 'Archive method: ', ArchUPA.Method.Name );
-  WriteLn( 'repacking, please wait...' );
-  ArchUPA.Save( EmptyStr, AMethod, ASolid, False );
-  ArchUPA.Destroy();
+  WriteLn( 'Archive method: ', fArchCtx.Method.Name );
+  WriteLn( 'Solid stream: ', YesNo( fArchCtx.Solid ) );
+  WriteLn( 'Repacking archive, please wait...' );
+  fError := fArchCtx.Save( EmptyStr, fMethod, fSolid, False );
 end;
 
-procedure TMainApp.AppDoUnpack( AFile, ADir: String );
+procedure TMainApp.AppDoUnpack();
 var
-  ArchUPA : TUniPackArchive;
   FileInfo : TFileInfoUPA;
-  ErrorUPA : TErrorUPA;
   i : Integer;
 begin
-  WriteLn( 'File: ', AFile );
-  WriteLn( 'Path: ', ADir );
-  ArchUPA := TUniPackArchive.Create();
-  if fNewPackBufSize > 0 then ArchUPA.PackBufSize := fNewPackBufSize;
-  if fNewOutputBufSize > 0 then ArchUPA.OutputBufSize := fNewOutputBufSize;
+  fError := fArchCtx.Open( fProcArch );
+  if fError <> eupOK then Exit;
 
-  ErrorUPA := ArchUPA.Open( AFile );
-  if ErrorUPA <> eupOK then begin
-    WriteLn( 'UPA ERROR: ', ErrStrUPA( ErrorUPA ) );
-    Exit();
-  end;
+  WriteLn( 'Archive method: ', fArchCtx.Method.Name );
+  WriteLn( 'Solid stream: ', YesNo( fArchCtx.Solid ) );
 
-  WriteLn( 'Archive method: ', ArchUPA.Method.Name );
-
-  for i := 0 to ArchUPA.Count()-1 do begin
-    FileInfo := ArchUPA.FileInfo(i);
+  for i := 0 to fArchCtx.Count()-1 do begin
+    FileInfo := fArchCtx.FileInfo(i);
     WriteLn();
     WriteLn( FileInfo.Name );
-    WriteLn(  'size: ', FileInfo.Size,
-      ' attr: ', binStr( FileInfo.Attr, 8 ),
-      ' time: ', StrTimePOSIX( FileInfo.Time ) );
+    Write( Format('  \size: %.2f Kb', [FileInfo.Size/1024]) );
+    Write( ' \attr: ', binStr( FileInfo.Attr, 8 ) );
+    Write( ' \date: ', StrTimePOSIX( FileInfo.Time ) );
   end;
 
-  ArchUPA.WriteFiles( ADir );
-  ArchUPA.Destroy();
+  fError := fArchCtx.WriteFiles( fProcDir );
 end;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
 
 function TMainApp.ErrStrUPA( ErrCode: TErrorUPA ): String;
+var
+  method_error : Integer;
 begin
   case ErrCode of
     eupOK:
@@ -309,13 +282,24 @@ begin
       Result := 'invalid UPA file';
     eupUnknownMethod:
       Result := 'unknown compression method';
+    eupMethodNotImplemented:
+      Result := 'method doesn''t support specified action';
+    eupInvalidInput:
+      Result := 'invalid input';
     eupMemoryError:
       Result := 'memory error';
-    eupMethodError:
-      Result := 'internal method error';
+    eupMethodError: begin
+      fMethod.HasError( @method_error );
+      Result := 'internal method error: ' + fMethod.ErrorMsg( method_error );
+      end
     else
       Result := 'unknown error';
   end;
+end;
+
+function TMainApp.YesNo( expr: Boolean ): String;
+begin
+  if expr then Result := 'Yes' else Result := 'No';
 end;
 
 {══════════════════════════════════════════════════════════════════════════════}
@@ -325,7 +309,8 @@ begin
   inherited Create( TheOwner );
   StopOnException := True;
   CaseSensitiveOptions := True;
-  FWorkMode := MODE_UNKNOWN;
+  fWorkMode := awmUnknown;
+  fError := eupOK;
 end;
 
 destructor TMainApp.Destroy();
