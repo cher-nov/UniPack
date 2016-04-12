@@ -60,7 +60,7 @@ type { UPA Archives management class ══════════════�
     FDplPackedBuf : Pointer;
     FDplDataOutBuf : Pointer;
     FDplCurrentFile : Integer;
-    FDplFileBytesDone : QWord;
+    FDplFileBytesLeft : QWord;
     FDplChunkDataLeft : SizeUInt;
     FDplSkippedBefore : QWord; //needed for solid stream
 
@@ -595,7 +595,7 @@ begin
     fname := DirPath + entry^.Info.Name;
     hfile := FileCreate( fname );
 
-    while FDplFileBytesDone < entry^.Info.Size do begin
+    while FDplFileBytesLeft > 0 do begin
       BytesRead := PipelineGetData();
       FileWrite( hfile, FDplDataOutBuf^, BytesRead );
     end;
@@ -676,13 +676,11 @@ end;
 
 procedure TUniPackArchive.PipelineInit();
 var
-  entry : PFileEntryUPA;
   packed_size : QWord;
 begin
   FDplCurrentFile := FindFirstNotEmptyFile(0);
   if FDplCurrentFile = FFiles.Count then
     Exit;
-  entry := GetEntry( FDplCurrentFile );
 
   PipelineResetState( True );
   FDplDataOutBuf := GetMem( FOutputBufSize );
@@ -692,7 +690,7 @@ begin
     FDplPackedBuf := GetMem( FPackBufSize );
     SetFilePos( FFileHandle, FStreamStartPos );
     if FSolid then packed_size := FStreamSize
-      else packed_size := entry^.Info.PackSize;
+      else packed_size := GetEntry(FDplCurrentFile)^.Info.PackSize;
     FMethod.InitUnpack( packed_size );
 
   end else begin
@@ -702,8 +700,9 @@ end;
 
 procedure TUniPackArchive.PipelineResetState( Forced: Boolean );
 begin
-  FDplFileBytesDone := 0;
   FDplSkippedBefore := 0; //needed only on solid stream
+  if FDplCurrentFile = FFiles.Count then FDplFileBytesLeft := 0
+    else FDplFileBytesLeft := GetEntry(FDplCurrentFile)^.Info.Size;
   if not FSolid or Forced then
     FDplChunkDataLeft := 0;
 end;
@@ -740,8 +739,8 @@ begin
       else Exit( False );
   end;
 
-  if FileIndex = FFiles.Count then begin
-    FDplCurrentFile := FileIndex;
+  if FileIndex >= FFiles.Count then begin
+    FDplCurrentFile := FFiles.Count;
     PipelineResetState();
     PipelineEndUnpack();
     Exit( True );
@@ -767,13 +766,11 @@ begin
     //if packed data is solid, successively unpack files that are between
     //old and new index to skip them (we don't use unpacked data here)
     //note: empty files between old and new indexes will be successfully
-    //skipped because FDplFileBytesDone will equal to 0
-    entry := GetEntry( FDplCurrentFile );
+    //skipped because FDplFileBytesLeft will equal to 0
     repeat
-      if entry^.Info.Size = FDplFileBytesDone then begin
+      if FDplFileBytesLeft = 0 then begin
         FDplCurrentFile += 1;
         PipelineResetState();
-        entry := GetEntry( FDplCurrentFile );
       end else begin
         PipelineGetData();
       end;
@@ -788,21 +785,19 @@ function TUniPackArchive.PipelineGetData( OutBufOffset: SizeUInt;
 var
   entry : PFileEntryUPA;
   out_size, fread_size : SizeUInt;
-  left_size, chunk_size, skip_size : QWord;
+  chunk_size, skip_size : QWord;
   out_buf, void_buf : Pointer; //for skipping data
 begin
   Result := 0;
 
-  if FDplCurrentFile = FFiles.Count then
+  if AutoNext and (FDplFileBytesLeft = 0) then
+    PipelineSetNext( FDplCurrentFile+1 );
+  if (FDplFileBytesLeft = 0) then
     Exit;
   entry := GetEntry( FDplCurrentFile );
 
-  left_size := entry^.Info.Size - FDplFileBytesDone;
-  if left_size = 0 then
-    Exit;
-
   out_size := FOutputBufSize - OutBufOffset;
-  if out_size > left_size then out_size := left_size;
+  if out_size > FDplFileBytesLeft then out_size := FDplFileBytesLeft;
   out_buf := FDplDataOutBuf + OutBufOffset;
 
   if FDplCurrentFile < FPackedCount then begin
@@ -846,9 +841,7 @@ begin
     Result := out_size;
   end;
 
-  FDplFileBytesDone += Result;
-  if AutoNext and (FDplFileBytesDone = entry^.Info.Size) then
-    PipelineSetNext( FDplCurrentFile+1 );
+  FDplFileBytesLeft -= Result;
 end;
 
 end.
