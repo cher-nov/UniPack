@@ -70,27 +70,30 @@ size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
   lib_zstream_pack.next_out = outbuf_ptr;
   lib_zstream_pack.avail_out = outbuf_size;
 
-  int result, flush;
-  size_t input_size = lib_zstream_pack.avail_in;
+  size_t input_size, chunk_left;
+  int flush, result;
+
+  input_size = lib_zstream_pack.avail_in;
   flush = (lib_pack_left > 0) ? Z_NO_FLUSH : Z_FINISH;
   result = z_deflate( &lib_zstream_pack, flush );
 
   switch (result) {
     case Z_OK:
+      chunk_left = lib_zstream_pack.avail_in;
+      lib_pack_left -= input_size - chunk_left;
+    break;
     case Z_STREAM_END:
-      if (flush == Z_FINISH) {
-        lib_pack_flushed = true;
-      } else {
-        lib_pack_left -= input_size - lib_zstream_pack.avail_in;
-      }
-      if (data_left != NULL) { *data_left = lib_zstream_pack.avail_in; }
-      return outbuf_size - lib_zstream_pack.avail_out;
+      chunk_left = 0;
+      lib_pack_flushed = true;
     break;
 
     default:
       lib_error = result;
       return 0;
   }
+
+  if (data_left != NULL) { *data_left = chunk_left; }
+  return outbuf_size - lib_zstream_pack.avail_out;
 }
 
 up_datasize_t up_pack_left() {
