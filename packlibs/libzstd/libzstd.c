@@ -77,7 +77,6 @@ size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
   } else {
     if (lib_pack_flush_sz == 0) {
       result = ZBUFF_compressEnd( lib_pack_ctx, outbuf_ptr, &done_size );
-      lib_pack_data_end = true;
     } else {
       result = ZBUFF_compressFlush( lib_pack_ctx, outbuf_ptr, &done_size );
     }
@@ -90,6 +89,7 @@ size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
       lib_pack_left_sz -= read_size;
       chunk_left = lib_pack_chunk_sz;
     } else {
+      lib_pack_data_end = true;
       lib_pack_flush_sz = result;
       chunk_left = 0;
     }
