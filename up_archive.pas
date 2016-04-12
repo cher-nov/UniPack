@@ -821,7 +821,7 @@ begin
         Result := FMethod.UnpackStep( out_buf, out_size, @FDplChunkDataLeft );
       end else begin //if less
         skip_size := entry^.SkipBytesBefore - FDplSkippedBefore;
-        if skip_size > FOutputBufSize then out_size := FOutputBufSize;
+        if skip_size > FOutputBufSize then skip_size := FOutputBufSize;
         skip_size := FMethod.UnpackStep( void_buf, skip_size, @FDplChunkDataLeft );
       end;
     until FDplSkippedBefore = entry^.SkipBytesBefore;
