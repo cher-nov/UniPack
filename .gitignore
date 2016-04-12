@@ -1,7 +1,9 @@
 backup/
 lib/
+test/
 
 *.exe
+*.cmd
 *.dll
 *.dylib
 *.upa
@@ -25,5 +27,6 @@ Desktop.ini
 
 # Exceptions
 !libz.a
+!clean.cmd
 temporary.pas
 roadmap.txt
