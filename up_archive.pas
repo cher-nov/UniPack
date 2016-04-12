@@ -587,7 +587,7 @@ begin
     if FileIndexes = nil then begin
       CurrentFile += 1
     end else begin
-      CurrentFile := FileIndexes.Integers[fnum];
+      CurrentFile := FileIndexes[fnum];
       fnum += 1;
     end;
 
