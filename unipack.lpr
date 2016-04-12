@@ -8,14 +8,14 @@ uses
   cthreads, {$ENDIF}{$ENDIF}
   Classes, SysUtils,
   CustApp, dynlibs,
-  up_methods, up_archive, routines;
+  up_methods, up_archive, routines, int_list;
 
 { –=────────────────────────────────────────────────────────────────────────=– }
 type { ═ TMainApp ──────────────────────────────────────────────────────────── }
 
   TMainApp = class( TCustomApplication )
   const
-    sAppVersion = '0.3.2';
+    sAppVersion = '0.3.3';
   strict private
     fWorkMode : ( awmUnknown, awmPack, awmUnpack, awmRepack );
     fArchCtx : TUniPackArchive;
@@ -24,8 +24,11 @@ type { ═ TMainApp ────────────────────
     fProcDir : String;
     fSolid : Boolean;
     fMethod : TUniPackMethod;
+    fSkipFiles : TIntList;
     procedure LoadMethods( aDir: String );
     procedure EnumMethods();
+    procedure ListFiles();
+    procedure DeleteFiles();
     procedure AppDoPack();
     procedure AppDoRepack();
     procedure AppDoUnpack();
@@ -43,7 +46,9 @@ type { ═ TMainApp ────────────────────
 procedure TMainApp.DoRun();
 var
   OptArch, OptDir : Boolean;
+  split_list : TStringList;
   method_name : uplib_MethodName;
+  i : Integer;
 begin
   WriteLn( Title, ' ', sAppVersion );
   WriteLn( 'Written by KoDi Studio, 2015-2016' );
@@ -64,6 +69,7 @@ begin
     WriteLn( '  -l - output list of avaliable compression methods and exit' );
     //WriteLn( '  -i - output file information and exit' );
     WriteLn( '  -s - create solid archive' );
+    WriteLn( '  -r LIST - specify files to skip on unpack/repack (e.g. -r 1,3,5)' );
     WriteLn( '  -pbuf SIZE - set size of packed data buffer, in KBytes' );
     WriteLn( '  -obuf SIZE - set size of output buffers, in KBytes' );
     //WriteLn( '  -q - quiet mode (without detailed logging)' );
@@ -125,7 +131,9 @@ begin
       Terminate(); Exit();
     end;
   end;
-      
+
+  fSkipFiles := nil;
+  split_list := nil;
   if fWorkMode in [awmUnpack, awmRepack] then begin
     if not OptArch then begin
       WriteLn( 'ERROR: file to unpack/repack isn''t specified.' );
@@ -137,14 +145,24 @@ begin
         Terminate(); Exit();
       end;
     end;
-    if fWorkMode <> awmRepack then begin
+    if fWorkMode = awmUnpack then begin
       if OptDir then fProcDir := GetOptionValue('D')
                 else fProcDir := ChangeFileExt( fProcArch, EmptyStr );
       CreateDir( fProcDir ); //no exception if dir already exists
     end;
+    if HasOption('r') then begin
+      try
+        fSkipFiles := TIntList.Create();
+        fSkipFiles.Sorted := True;
+        split_list := TStringList.Create();
+        split_list.CommaText := GetOptionValue('r');
+        for i := 0 to split_list.Count-1 do
+          fSkipFiles.Add( StrToInt64(split_list[i]) );
+      finally
+        split_list.Free();
+      end;
+    end;
   end;
-
-  
 
   fSolid := HasOption('s');
   WriteLn( 'File: ', fProcArch );
@@ -170,6 +188,7 @@ begin
   if fError <> eupOK then
     WriteLn( 'ERROR: ', ErrStrUPA(fError) );
   fArchCtx.Free();
+  fSkipFiles.Free();
   Terminate();
 end;
 
@@ -208,6 +227,37 @@ begin
     end;
 end;
 
+procedure TMainApp.ListFiles();
+var
+  info : TFileInfoUPA;
+  i : Integer;
+begin
+  for i := 0 to fArchCtx.Count()-1 do begin
+    info := fArchCtx.FileInfo(i);
+    WriteLn( i, '. ', info.Name );
+    Write( Format('=== size: %.2f Kb', [info.Size/1024]) );
+    Write( ' = attr: ', binStr( info.Attr, 8 ) );
+    WriteLn( ' = date: ', StrTimePOSIX( info.Time ) );
+    WriteLn();
+  end;
+end;
+
+procedure TMainApp.DeleteFiles();
+var
+  i, del : Integer;
+  info : TFileInfoUPA;
+begin
+  if fSkipFiles <> nil then begin
+    for i := 0 to fSkipFiles.Count-1 do begin
+      del := fSkipFiles[i];
+      info := fArchCtx.FileInfo( del-i );
+      fArchCtx.DeleteFile( del-i );
+      WriteLn( Format('Deleted #%d: %s', [del, info.Name]) );
+    end;
+    WriteLn();
+  end;
+end;
+
 { –=────────────────────────────────────────────────────────────────────────=– }
 
 procedure TMainApp.AppDoPack();
@@ -235,33 +285,25 @@ procedure TMainApp.AppDoRepack();
 begin
   fError := fArchCtx.Open( fProcArch );
   if fError <> eupOK then Exit;
-
   WriteLn( 'Archive method: ', fArchCtx.Method.Name );
   WriteLn( 'Solid stream: ', YesNo( fArchCtx.Solid ) );
+  WriteLn();
+  DeleteFiles();
   WriteLn( 'Repacking archive, please wait...' );
   fError := fArchCtx.Save( EmptyStr, fMethod, fSolid, False );
 end;
 
 procedure TMainApp.AppDoUnpack();
-var
-  FileInfo : TFileInfoUPA;
-  i : Integer;
 begin
   fError := fArchCtx.Open( fProcArch );
   if fError <> eupOK then Exit;
 
   WriteLn( 'Archive method: ', fArchCtx.Method.Name );
   WriteLn( 'Solid stream: ', YesNo( fArchCtx.Solid ) );
-
-  for i := 0 to fArchCtx.Count()-1 do begin
-    FileInfo := fArchCtx.FileInfo(i);
-    WriteLn();
-    WriteLn( FileInfo.Name );
-    Write( Format('  \size: %.2f Kb', [FileInfo.Size/1024]) );
-    Write( ' \attr: ', binStr( FileInfo.Attr, 8 ) );
-    Write( ' \date: ', StrTimePOSIX( FileInfo.Time ) );
-  end;
-
+  WriteLn();
+  DeleteFiles();
+  ListFiles();
+  WriteLn( 'Writing files, please wait...' );
   fError := fArchCtx.WriteFiles( fProcDir );
 end;
 
