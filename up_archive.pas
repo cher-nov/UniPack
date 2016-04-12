@@ -431,8 +431,8 @@ begin
   PackingNow := False;
   while (FDplCurrentFile < FFiles.Count) or PackingNow do begin
     if not aSolid and not PackingNow then begin
-      aMethod.InitPack( GetEntry(FDplCurrentFile)^.Info.Size );
       upd_pos := FDplCurrentFile;
+      aMethod.InitPack( GetEntry(upd_pos)^.Info.Size );
       PackingNow := True;
     end;
     if (ChunkLeft = 0) and (aMethod.PackLeft() > 0) then begin
