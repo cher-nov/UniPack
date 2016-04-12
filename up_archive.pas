@@ -437,7 +437,7 @@ begin
     end;
     if (ChunkLeft = 0) and (aMethod.PackLeft() > 0) then begin
       repeat //read data to be packed, from pipeline
-        ChunkLeft += PipelineGetData( ChunkLeft, True );
+        ChunkLeft += PipelineGetData( ChunkLeft, aSolid );
       until (
         not aSolid //if non-solid, read file data only once
         or (ChunkLeft = FOutputBufSize) //FDplDataOutBuf is full
@@ -463,8 +463,8 @@ begin
     PackingNow := not aMethod.PackDone();
     if not PackingNow then begin
       aMethod.EndPack();
-      PipelineSetNext( FDplCurrentFile+1 );
-      PackingNow := False;
+      if not aSolid then
+        PipelineSetNext( FDplCurrentFile+1 );
     end;
   end;
 
