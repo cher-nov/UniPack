@@ -27,6 +27,7 @@ Desktop.ini
 
 # Exceptions
 !libz.a
+!zstd_buff.a
 !clean.cmd
 temporary.pas
 roadmap.txt

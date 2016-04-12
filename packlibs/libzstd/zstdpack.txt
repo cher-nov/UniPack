@@ -1,0 +1,15 @@
+libzstd - UniPack compression method plugin
+(c) KoDi Studio, 2016
+
+UniPack method ID: ZSTD (0x4454535A)
+
+════════════════════════════════════════════════════════════════════════════════
+1. Compression technique
+
+libzstd is a wrapper around Zstd (Zstandard) compression library.
+
+════════════════════════════════════════════════════════════════════════════════
+2. Additional information
+
+http://www.zstd.net
+http://github.com/Cyan4973/zstd
