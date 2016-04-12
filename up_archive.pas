@@ -463,6 +463,7 @@ begin
     PackingNow := not aMethod.PackDone();
     if not PackingNow then begin
       aMethod.EndPack();
+      PipelineSetNext( FDplCurrentFile+1 );
       PackingNow := False;
     end;
   end;
@@ -649,8 +650,8 @@ function TUniPackArchive.FindFirstNotEmptyFile( StartIndex: Integer ): Integer;
 begin
   repeat
     Result := StartIndex;
-    if Result = FFiles.Count then
-      Exit;
+    if Result >= FFiles.Count then
+      Exit( FFiles.Count );
     StartIndex += 1;
   until GetEntry(Result)^.Info.Size > 0;
 end;
