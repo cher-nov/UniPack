@@ -6,6 +6,8 @@
 #include "zstd/zbuff_static.h"
 #include "libzstd.h"
 
+#define ZSTD_CLEVEL_DEFAULT 0
+
 // FIXME: there must be default NO_ERROR value
 // for size_t in the future versions of ZStd
 #define ZSTD_NO_ERROR 0
@@ -52,7 +54,7 @@ const char* up_error_msg( int err_code ) {
 
 void up_pack_init( up_datasize_t pack_size ) {
   lib_pack_ctx = ZBUFF_createCCtx();
-  size_t init_code = ZBUFF_compressInit( lib_pack_ctx, ZSTD_maxCLevel() );
+  size_t init_code = ZBUFF_compressInit( lib_pack_ctx, ZSTD_CLEVEL_DEFAULT );
   if ( ZBUFF_isError( init_code ) ) {
     lib_error = init_code;
   } else {
