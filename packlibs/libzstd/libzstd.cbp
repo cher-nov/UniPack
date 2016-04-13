@@ -46,7 +46,7 @@
 		</Compiler>
 		<Linker>
 			<Add option="-static-libgcc" />
-			<Add library="zstd\zstd_buff.a" />
+			<Add library="zstd/zstd.a" />
 			<Add directory="./" />
 		</Linker>
 		<Unit filename="libzstd.c">
