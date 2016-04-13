@@ -4,10 +4,12 @@
 */
 
 #include "zstd/zbuff_static.h"
-#include "zstd/error_public.h"
 #include "libzstd.h"
 
-static int lib_error = ZSTD_error_no_error;
+// FIXME: there must be default NO_ERROR value
+// for size_t in the future versions of ZStd
+#define ZSTD_NO_ERROR 0
+static size_t lib_error = ZSTD_NO_ERROR;
 
 static ZBUFF_CCtx* lib_pack_ctx;
 static char* lib_pack_chunk;
@@ -30,19 +32,19 @@ int up_info_version() {
 }
 
 bool up_has_error( int* ret_code ) {
-  int err = lib_error;
+  size_t err = lib_error;
   if (ret_code != NULL) {
-    *ret_code = err;
-    lib_error = ZSTD_error_no_error;
+    *ret_code = (int)err;
+    lib_error = ZSTD_NO_ERROR;
   }
-  return (err != ZSTD_error_no_error);
+  return (err != ZSTD_NO_ERROR);
 }
 
 const char* up_error_msg( int err_code ) {
-  if (err_code == ZSTD_error_no_error) {
+  if (err_code == ZSTD_NO_ERROR) {
     return NULL;
   } else {
-    return ZSTD_getErrorName(err_code);
+    return ZSTD_getErrorName( (size_t)err_code );
   }
 }
 
@@ -52,7 +54,7 @@ void up_pack_init( up_datasize_t pack_size ) {
   lib_pack_ctx = ZBUFF_createCCtx();
   size_t init_code = ZBUFF_compressInit( lib_pack_ctx, ZSTD_maxCLevel() );
   if ( ZBUFF_isError( init_code ) ) {
-    lib_error = (int)init_code;
+    lib_error = init_code;
   } else {
     lib_pack_data_end = false;
     lib_pack_left_sz = pack_size;
@@ -95,7 +97,7 @@ size_t up_pack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left ) {
     }
     if (data_left != NULL) { *data_left = chunk_left; }
   } else {
-    lib_error = (int)result;
+    lib_error = result;
   }
 
   return done_size;
@@ -123,7 +125,7 @@ void up_unpack_init( up_datasize_t unpack_size ) {
   lib_unpack_ctx = ZBUFF_createDCtx();
   size_t init_code = ZBUFF_decompressInit( lib_unpack_ctx );
   if ( ZBUFF_isError( init_code ) ) {
-    lib_error = (int)init_code;
+    lib_error = init_code;
   } else {
     lib_unpack_left_sz = unpack_size;
   }
@@ -148,7 +150,7 @@ size_t up_unpack_step( void* outbuf_ptr, size_t outbuf_size, size_t* data_left )
     lib_unpack_left_sz -= read_size;
     if (data_left != NULL) { *data_left = lib_unpack_chunk_sz; }
   } else {
-    lib_error = (int)result;
+    lib_error = result;
   }
 
   return done_size;
