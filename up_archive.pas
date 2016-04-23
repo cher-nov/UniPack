@@ -4,7 +4,12 @@ unit up_archive;
 {$LONGSTRINGS ON}
 {$POINTERMATH ON}
 
-//TODO: Rewrite data pipeline as a separate helper class
+// TODO: Rewrite data pipeline as a separate helper class.
+// TODO: Progress reporting callbacks.
+{  TODO: Direct stream copying: don't repack data if it's packing method
+         and solidness were not changed. }
+// TODO: More checks for errors in public methods.
+// TODO: Finalize code (for example, after errors) by nested functions.
 
 interface {════════════════════════════════════════════════════════════════════}
 

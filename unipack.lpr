@@ -3,6 +3,8 @@ program unipack;
 {$MODE OBJFPC}
 {$LONGSTRINGS ON}
 
+// TODO: Version of the archiver with GUI.
+
 uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads, {$ENDIF}{$ENDIF}
