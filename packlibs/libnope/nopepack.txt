@@ -1,5 +1,5 @@
 libnope - UniPack compression method plugin
-(c) KoDi Studio, 2015
+(c) Dmitry D. Chernov, 2015-2016
 
 UniPack method ID: NOPE (0x45504F4E)
 

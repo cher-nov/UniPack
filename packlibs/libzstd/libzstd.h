@@ -1,6 +1,6 @@
 /*
   libzstd.h
-  (c) KoDi studio, 2016
+  (c) Dmitry D. Chernov, 2016
 */
 
 #ifndef __LIBZSTD_H__

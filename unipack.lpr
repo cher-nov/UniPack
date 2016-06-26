@@ -53,7 +53,7 @@ var
   i : Integer;
 begin
   WriteLn( Title, ' ', sAppVersion );
-  WriteLn( 'Written by KoDi Studio, 2015-2016' );
+  WriteLn( 'Written by Dmitry D. Chernov, 2015-2016' );
 
   if ParamCount = 0 then begin
     WriteLn( 'Usage: unipack.exe -[a METHOD|u] <-F archive.upa> <-D path> [options]' );

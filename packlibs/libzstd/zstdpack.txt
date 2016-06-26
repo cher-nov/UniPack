@@ -1,5 +1,5 @@
 libzstd - UniPack compression method plugin
-(c) KoDi Studio, 2016
+(c) Dmitry D. Chernov, 2016
 
 UniPack method ID: ZSTD (0x4454535A)
 

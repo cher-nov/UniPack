@@ -1,6 +1,6 @@
 /*
   libzstd.c
-  (c) KoDi studio, 2016
+  (c) Dmitry D. Chernov, 2016
 */
 
 #include "zstd/zbuff_static.h"

@@ -1,6 +1,6 @@
 /*
   libnope.h
-  (c) KoDi studio, 2015
+  (c) Dmitry D. Chernov, 2015-2016
 */
 
 #ifndef __LIBNOPE_H__
